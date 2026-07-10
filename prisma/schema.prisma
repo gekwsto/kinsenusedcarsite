@@ -1,0 +1,263 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum InterestType {
+  LEASING
+  FINANCING
+  TEST_DRIVE
+  GENERAL
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  IN_PROGRESS
+  WON
+  LOST
+  SPAM
+}
+
+enum ContactMessageStatus {
+  NEW
+  READ
+  ARCHIVED
+  SPAM
+}
+
+enum ImportStatus {
+  SUCCESS
+  PARTIAL_SUCCESS
+  FAILED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  firstName    String?
+  lastName     String?
+  phone        String?
+  role         Role     @default(CUSTOMER)
+  isActive     Boolean  @default(true)
+
+  favorites Favorite[]
+  leads     Lead[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([role])
+}
+
+model Vehicle {
+  id            String  @id @default(cuid())
+  externalCarId String? @unique
+  slug          String  @unique
+
+  maker            String
+  model            String
+  yearRelease      Int?
+  price            Decimal? @db.Decimal(10, 2)
+  monthlyPrice     Decimal? @db.Decimal(10, 2)
+  km               Int?
+  cc               Int?
+  hp               Int?
+  fuel             String?
+  transmissionType String?
+  color            String?
+  typeOfCar        String?
+
+  offer     Boolean @default(false)
+  froze     Boolean @default(false)
+  isDeleted Boolean @default(false)
+
+  plate String?
+  vin   String?
+
+  description String?
+  features    Json?
+
+  seoTitle       String?
+  seoDescription String?
+
+  images    VehicleImage[]
+  favorites Favorite[]
+  leads     Lead[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([maker])
+  @@index([model])
+  @@index([yearRelease])
+  @@index([price])
+  @@index([monthlyPrice])
+  @@index([fuel])
+  @@index([transmissionType])
+  @@index([color])
+  @@index([typeOfCar])
+  @@index([froze])
+  @@index([isDeleted])
+  @@index([offer])
+  @@index([froze, isDeleted])
+}
+
+model VehicleImage {
+  id        String  @id @default(cuid())
+  vehicleId String
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  url       String
+  alt       String?
+  sortOrder Int     @default(0)
+  isMain    Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([vehicleId])
+}
+
+model Favorite {
+  id        String  @id @default(cuid())
+  userId    String
+  vehicleId String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, vehicleId])
+  @@index([userId])
+  @@index([vehicleId])
+}
+
+model Lead {
+  id           String       @id @default(cuid())
+  userId       String?
+  user         User?        @relation(fields: [userId], references: [id])
+  vehicleId    String?
+  vehicle      Vehicle?     @relation(fields: [vehicleId], references: [id])
+  interestType InterestType
+
+  firstName String
+  lastName  String
+  email     String
+  phone     String?
+  message   String?
+
+  status        LeadStatus @default(NEW)
+  source        String?
+  internalNotes Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([interestType])
+  @@index([vehicleId])
+  @@index([userId])
+}
+
+model ContactMessage {
+  id        String @id @default(cuid())
+  firstName String
+  lastName  String?
+  email     String
+  phone     String?
+  message   String
+
+  status ContactMessageStatus @default(NEW)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+model ImportLog {
+  id            String       @id @default(cuid())
+  source        String
+  status        ImportStatus
+  receivedCount Int          @default(0)
+  createdCount  Int          @default(0)
+  updatedCount  Int          @default(0)
+  deletedCount  Int          @default(0)
+  frozenCount   Int          @default(0)
+  errors        Json?
+  rawPayload    Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model FaqItem {
+  id        String  @id @default(cuid())
+  question  String
+  answer    String
+  category  String?
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category])
+  @@index([isActive])
+}
+
+model SiteSetting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Admin-editable text content for public pages (hero copy, info cards, etc).
+// Same key/value-override pattern as SiteSetting: each row overrides one
+// named content block, and the app falls back to hardcoded defaults for any
+// key that hasn't been edited yet.
+model PageContent {
+  id    String @id @default(cuid())
+  key   String @unique
+  value Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Lightweight trail for sensitive admin actions (role changes, activation
+// toggles, password resets, user creation). Deliberately minimal — no FK to
+// User (so the log survives even if the actor/target row is later deleted),
+// just enough to answer "who did what to whom, and when."
+model AdminAuditLog {
+  id         String   @id @default(cuid())
+  actorId    String
+  actorEmail String
+  action     String
+  targetType String
+  targetId   String?
+  metadata   Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([actorId])
+  @@index([action])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+}
