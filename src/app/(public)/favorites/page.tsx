@@ -5,6 +5,7 @@ import { VehicleGrid } from "@/components/vehicles/vehicle-grid";
 import { EmptyState } from "@/components/vehicles/empty-state";
 import { auth } from "@/lib/auth";
 import { listFavoriteVehicles } from "@/server/services/favorite.service";
+import { resolveVehicleImagesForList } from "@/server/services/vehicle-image.service";
 
 export const metadata: Metadata = {
   title: "Αγαπημένα",
@@ -31,7 +32,8 @@ export default async function FavoritesPage() {
     );
   }
 
-  const vehicles = await listFavoriteVehicles(session.user.id);
+  const favoriteVehicles = await listFavoriteVehicles(session.user.id);
+  const vehicles = await resolveVehicleImagesForList(favoriteVehicles);
 
   return (
     <div className="container-page py-8">

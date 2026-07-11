@@ -3,6 +3,7 @@ import { requirePagePermission } from "@/lib/permissions";
 import { getAdminVehicleById } from "@/server/services/vehicle.service";
 import { VehicleForm } from "@/components/admin/vehicle-form";
 import { VehicleImageManager } from "@/components/admin/vehicle-image-manager";
+import { VehicleImageSourcePanel } from "@/components/admin/vehicle-image-source-panel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface EditVehiclePageProps {
@@ -29,6 +30,15 @@ export default async function EditVehiclePage({ params }: EditVehiclePageProps) 
         </CardHeader>
         <CardContent>
           <VehicleImageManager vehicleId={vehicle.id} images={vehicle.images} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Πηγή Εικόνων</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <VehicleImageSourcePanel vin={vehicle.vin} images={vehicle.images} />
         </CardContent>
       </Card>
 

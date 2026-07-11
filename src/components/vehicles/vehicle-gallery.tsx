@@ -3,9 +3,7 @@
 import * as React from "react";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { cn } from "@/lib/utils";
-
-const FALLBACK_IMAGE = "/images/vehicle-fallback.png";
+import { cn, FALLBACK_VEHICLE_IMAGE } from "@/lib/utils";
 
 interface GalleryImage {
   id: string;
@@ -14,7 +12,7 @@ interface GalleryImage {
 }
 
 export function VehicleGallery({ images, title }: { images: GalleryImage[]; title: string }) {
-  const items = images.length > 0 ? images : [{ id: "fallback", url: FALLBACK_IMAGE, alt: title }];
+  const items = images.length > 0 ? images : [{ id: "fallback", url: FALLBACK_VEHICLE_IMAGE, alt: title }];
   const [activeIndex, setActiveIndex] = React.useState(0);
 
   const goTo = React.useCallback(

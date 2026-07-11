@@ -7,6 +7,7 @@ import { VehicleFilters } from "@/components/vehicles/vehicle-filters";
 import { Pagination } from "@/components/vehicles/pagination";
 import { vehicleFilterSchema } from "@/lib/validators/vehicle.schema";
 import { listPublicVehicles, getPublicFilterOptions } from "@/server/services/vehicle.service";
+import { resolveVehicleImagesForList } from "@/server/services/vehicle-image.service";
 
 export const metadata: Metadata = {
   title: "Οχήματα",
@@ -34,6 +35,7 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
     listPublicVehicles(filters),
     getPublicFilterOptions(),
   ]);
+  const resolvedItems = await resolveVehicleImagesForList(items);
 
   return (
     <div className="container-page py-8">
@@ -41,9 +43,9 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
         <VehicleFilters options={filterOptions} />
 
         <div className="flex-1">
-          {items.length > 0 ? (
+          {resolvedItems.length > 0 ? (
             <>
-              <VehicleGrid vehicles={items} />
+              <VehicleGrid vehicles={resolvedItems} />
               <Pagination page={page} totalPages={totalPages} searchParams={rawSearchParams} />
             </>
           ) : (

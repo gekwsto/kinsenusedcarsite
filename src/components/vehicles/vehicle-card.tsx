@@ -3,9 +3,7 @@ import Link from "next/link";
 import { Gauge, Cog as EngineIcon, Fuel } from "lucide-react";
 import { FavoriteButton } from "@/components/vehicles/favorite-button";
 import { Badge } from "@/components/ui/badge";
-import { formatEuro, formatKm } from "@/lib/utils";
-
-const FALLBACK_IMAGE = "/images/vehicle-fallback.png";
+import { formatEuro, formatKm, FALLBACK_VEHICLE_IMAGE } from "@/lib/utils";
 
 export interface VehicleCardImage {
   id: string;
@@ -35,7 +33,7 @@ export interface VehicleCardVehicle {
 
 export function VehicleCard({ vehicle, priority = false }: { vehicle: VehicleCardVehicle; priority?: boolean }) {
   const mainImage =
-    vehicle.images?.find((img) => img.isMain)?.url ?? vehicle.images?.[0]?.url ?? FALLBACK_IMAGE;
+    vehicle.images?.find((img) => img.isMain)?.url ?? vehicle.images?.[0]?.url ?? FALLBACK_VEHICLE_IMAGE;
 
   const stats = [
     vehicle.km !== null && vehicle.km !== undefined ? { icon: Gauge, label: formatKm(vehicle.km) } : null,

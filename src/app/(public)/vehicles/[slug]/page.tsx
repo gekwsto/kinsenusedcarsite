@@ -22,6 +22,7 @@ import { FavoriteButton } from "@/components/vehicles/favorite-button";
 import { InterestModal } from "@/components/vehicles/interest-modal";
 import { VehicleGrid } from "@/components/vehicles/vehicle-grid";
 import { getPublicVehicleBySlug, getSimilarVehicles } from "@/server/services/vehicle.service";
+import { resolveVehicleImages, resolveVehicleImagesForList } from "@/server/services/vehicle-image.service";
 import { formatEuro, formatKm } from "@/lib/utils";
 
 interface PageParams {
@@ -38,7 +39,8 @@ export async function generateMetadata({ params }: { params: Promise<PageParams>
     vehicle.seoDescription ||
     vehicle.description ||
     `${vehicle.maker} ${vehicle.model}${vehicle.yearRelease ? ` ${vehicle.yearRelease}` : ""} — μεταχειρισμένο όχημα με leasing από την Kinsen.`;
-  const image = vehicle.images[0]?.url ?? "/images/vehicle-fallback.png";
+  const resolved = await resolveVehicleImages(vehicle);
+  const image = resolved.mainImage.url;
 
   return {
     title,
@@ -58,7 +60,11 @@ export default async function VehicleDetailPage({ params }: { params: Promise<Pa
   const vehicle = await getPublicVehicleBySlug(slug);
   if (!vehicle) notFound();
 
-  const similarVehicles = await getSimilarVehicles(vehicle, 4);
+  const [similarVehiclesRaw, resolvedGallery] = await Promise.all([
+    getSimilarVehicles(vehicle, 4),
+    resolveVehicleImages(vehicle),
+  ]);
+  const similarVehicles = await resolveVehicleImagesForList(similarVehiclesRaw);
   const vehicleLabel = `${vehicle.maker} ${vehicle.model}${vehicle.yearRelease ? ` ${vehicle.yearRelease}` : ""}`;
   const isForSale = vehicle.price !== null;
 
@@ -87,7 +93,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<Pa
     mileageFromOdometer: vehicle.km
       ? { "@type": "QuantitativeValue", value: vehicle.km, unitCode: "KMT" }
       : undefined,
-    image: vehicle.images.map((img) => img.url),
+    image: resolvedGallery.images.map((img) => img.url),
     offers: vehicle.price
       ? { "@type": "Offer", price: vehicle.price, priceCurrency: "EUR", availability: "https://schema.org/InStock" }
       : undefined,
@@ -98,7 +104,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<Pa
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
       <div className="flex w-full justify-center">
-        <VehicleGallery images={vehicle.images} title={vehicleLabel} />
+        <VehicleGallery images={resolvedGallery.images} title={vehicleLabel} />
       </div>
 
       <div className="mx-auto mt-8 max-w-[1200px] rounded-3xl bg-[#f5f9fc] p-4 shadow-[0_0_12px_rgba(0,0,0,0.05)] sm:p-8">

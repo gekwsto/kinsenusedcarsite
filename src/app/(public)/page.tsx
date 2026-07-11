@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Hero } from "@/components/home/hero";
 import { StatsParagraph } from "@/components/home/stats-paragraph";
 import { CategoryLinks } from "@/components/home/category-links";
+import { FeaturedVehicles } from "@/components/home/featured-vehicles";
 import { HowItWorks } from "@/components/home/how-it-works";
 import { Benefits } from "@/components/home/benefits";
 
@@ -17,6 +18,7 @@ export default function HomePage() {
       <Hero />
       <StatsParagraph />
       <CategoryLinks />
+      <FeaturedVehicles />
       <HowItWorks />
       <Benefits />
     </>
