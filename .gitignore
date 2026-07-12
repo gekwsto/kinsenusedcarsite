@@ -13,3 +13,4 @@ public/uploads/*
 npm-debug.log*
 dev-server.log
 .claude/
+.env.example
