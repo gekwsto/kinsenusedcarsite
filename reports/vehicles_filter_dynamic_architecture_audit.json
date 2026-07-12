@@ -1,0 +1,100 @@
+{
+  "audit_status": "PASSED_WITH_FIXES",
+  "timestamp": "2026-07-12T00:00:00Z",
+  "scope": "/vehicles filter sidebar — dynamic-option architecture and accordion section-state audit",
+  "filter_inventory": [
+    { "section": "price", "canonicalField": "priceMin/priceMax", "urlParam": "priceMin/priceMax", "queryField": "price", "source": "business_configured", "range": "0-50000" },
+    { "section": "maker", "canonicalField": "maker", "urlParam": "maker", "queryField": "maker", "source": "database_derived", "scope": "full_public_inventory" },
+    { "section": "year", "canonicalField": "yearMin/yearMax", "urlParam": "yearMin/yearMax", "queryField": "yearRelease", "source": "business_configured", "range": "2010-2026" },
+    { "section": "km", "canonicalField": "kmMin/kmMax", "urlParam": "kmMin/kmMax", "queryField": "km", "source": "business_configured", "range": "10000-250000" },
+    { "section": "fuel", "canonicalField": "fuel", "urlParam": "fuel", "queryField": "fuel", "source": "database_derived", "scope": "full_public_inventory", "note": "FIXED this audit — was a hardcoded 4-item array, now options.fuels" },
+    { "section": "cc", "canonicalField": "ccMin/ccMax", "urlParam": "ccMin/ccMax", "queryField": "cc", "source": "business_configured", "range": "1000-2500" },
+    { "section": "hp", "canonicalField": "hpMin/hpMax", "urlParam": "hpMin/hpMax", "queryField": "hp", "source": "business_configured", "range": "80-250" },
+    { "section": "transmissionType", "canonicalField": "transmissionType", "urlParam": "transmissionType", "queryField": "transmissionType", "source": "database_derived", "scope": "full_public_inventory" },
+    { "section": "color", "canonicalField": "color", "urlParam": "color", "queryField": "color", "source": "database_derived", "scope": "full_public_inventory" },
+    { "section": "typeOfCar", "canonicalField": "typeOfCar", "urlParam": "typeOfCar", "queryField": "typeOfCar", "source": "database_derived", "scope": "full_public_inventory" },
+    { "section": "offers", "canonicalField": "offerOnly", "urlParam": "offerOnly", "queryField": "offer", "source": "canonical_boolean" }
+  ],
+  "source_of_truth_classification": {
+    "database_derived": ["maker", "fuel", "transmissionType", "color", "typeOfCar"],
+    "business_configured_numeric": ["price", "year", "km", "cc", "hp"],
+    "canonical_boolean": ["offers"]
+  },
+  "hardcoded_occurrences_discovered": [
+    {
+      "location": "src/components/vehicles/vehicle-filters.tsx (FUEL_FILTER_OPTIONS, pre-fix)",
+      "classification": "invalid_option_ownership",
+      "action": "removed; replaced with options.fuels.map(...) + resolveFuelIcon presentation resolver",
+      "status": "fixed"
+    },
+    {
+      "location": "src/components/vehicles/vehicle-filters.tsx (Accordion defaultValue=[\"price\",\"maker\"])",
+      "classification": "invalid_default_open_hardcode",
+      "action": "replaced with controlled value/onValueChange derived from committed active-filter sections",
+      "status": "fixed"
+    },
+    {
+      "location": "src/lib/vehicle-normalization.ts (TRANSMISSION_MAP, TYPE_OF_CAR_MAP, FUEL_MAP)",
+      "classification": "presentation_only_metadata_with_fallback",
+      "reason": "server-side ingestion-time normalization only; lookup() falls back to raw.trim() for unmapped values; never gates which distinct DB values the filter UI renders",
+      "status": "retained, no action needed"
+    },
+    {
+      "location": "src/lib/color-search.ts (COLOR_FAMILIES)",
+      "classification": "presentation_only_metadata_with_fallback",
+      "reason": "bilingual search-discovery metadata only; colorMatchesSearch always falls back to raw-value substring match; never used as a query value or option gate",
+      "status": "retained, correct by design"
+    },
+    {
+      "location": "src/components/vehicles/filter-option-metadata.ts (icon maps)",
+      "classification": "presentation_only_metadata_with_fallback",
+      "reason": "every resolver has a safe fallback icon (Cog/Car/FuelIcon); unknown raw values never fail to render",
+      "status": "retained, correct by design"
+    },
+    {
+      "location": "src/lib/query-params.ts comment mentioning \"BMW\"/\"Toyota\"",
+      "classification": "unrelated_display_content",
+      "reason": "prose example inside a code comment, not a data value",
+      "status": "no action needed"
+    }
+  ],
+  "accordion_state_audit": {
+    "owner": "single local React state `openSections: string[]` in VehicleFilters, controlling the one shared Accordion instance rendered by both the mobile Sheet and desktop aside",
+    "initial_state_policy": "open iff section has >=1 committed active filter chip at first render; identical computation on server (SSR via useSearchParams) and client — no hydration flip",
+    "reconciliation_policy": "on every activeChips change: if zero sections are now active, force-close all sections (covers clear-all and 'removed last chip manually'); otherwise diff previous vs current active-section sets and only toggle the sections that actually transitioned, leaving unrelated manually-opened/closed sections untouched",
+    "no_filter_result": "all 11 sections closed",
+    "price_only_url_result": "only 'price' open",
+    "maker_only_url_result": "only 'maker' open",
+    "multi_filter_url_result": "only the sections owning an active filter open (verified: fuel+color+km => exactly those 3)",
+    "sort_only_url_result": "all sections closed",
+    "pagination_only_url_result": "all sections closed",
+    "manual_toggle_result": "no URL/query/pagination/loader side-effect",
+    "final_value_removal_result": "section collapses",
+    "chip_removal_result": "matching section collapses",
+    "clear_all_result": "every section closes, including a manually-opened section with no active filter",
+    "back_result": "restores exactly the sections with restored active filters, closes ones no longer active",
+    "forward_result": "same, verified symmetric",
+    "hard_refresh_result": "correct on first paint, no flicker",
+    "mobile_result": "identical to desktop (shared state/component tree)",
+    "hydration_result": "no console errors/warnings observed on a 3-filter direct URL load"
+  },
+  "synthetic_option_tests": {
+    "method": "service-layer pure-function unit tests (Node built-in test runner, existing framework) against buildPublicFilterWhere and color-search.ts — no synthetic rows inserted into any database",
+    "values_used": {
+      "maker": "Aether Motors",
+      "fuel": "Hydrogen-X",
+      "transmissionType": "Adaptive-DCT-X",
+      "color": "Ultraviolet Pearl X",
+      "typeOfCar": "Urban-Crossover-X"
+    },
+    "results": "all synthetic values reach the Prisma where-predicate as plain field values (in/equals), identical code path to known values; no allowlist rejection observed"
+  },
+  "query_generation_test_results": "PASS — 11/11 new buildPublicFilterWhere tests pass",
+  "active_chip_test_results": "PASS — chips generated from committed searchParams via activeChips; verified via live CDP session for maker/fuel/transmission/color/typeOfCar/offers combinations",
+  "clear_all_test_results": "PASS — resets every NUMERIC_FIELDS/CSV_FIELDS/offerOnly entry plus closes every accordion section",
+  "pagination_scope_metadata_test": "getPublicFilterOptions() queries are `distinct` over PUBLIC_WHERE (all non-frozen, non-deleted vehicles) — independent of `page`/`pageSize`, confirmed by code inspection (no page/skip/take passed to those queries)",
+  "production_build_result": "PASS — npm run build succeeded; verified no-filter (all closed) and fuel=Hybrid (Καύσιμο open, dynamic options.fuels rendered) directly against the production server",
+  "unresolved_findings": [
+    "cdn-image.service.integration.test.ts's real-network CDN test fails in this environment — pre-existing, unrelated to /vehicles filters, not modified by this audit"
+  ]
+}

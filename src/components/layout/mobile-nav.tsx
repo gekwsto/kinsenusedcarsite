@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import { NavigationLink as Link } from "@/components/navigation/navigation-link";
 import { useSession, signOut } from "next-auth/react";
 import { Menu, User, LogOut } from "lucide-react";
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle, SheetClose } from "@/components/ui/sheet";

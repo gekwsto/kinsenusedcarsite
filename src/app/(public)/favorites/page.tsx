@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { NavigationLink as Link } from "@/components/navigation/navigation-link";
 import { Button } from "@/components/ui/button";
 import { VehicleGrid } from "@/components/vehicles/vehicle-grid";
 import { EmptyState } from "@/components/vehicles/empty-state";

@@ -4,6 +4,7 @@ import * as React from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/use-toast";
+import { useNavigationTransition } from "@/components/providers/navigation-transition-provider";
 
 interface FavoritesContextValue {
   favoriteIds: Set<string>;
@@ -17,6 +18,7 @@ const FavoritesContext = React.createContext<FavoritesContextValue | null>(null)
 export function FavoritesProvider({ children }: { children: React.ReactNode }) {
   const { status } = useSession();
   const router = useRouter();
+  const transition = useNavigationTransition();
   const [favoriteIds, setFavoriteIds] = React.useState<Set<string>>(new Set());
   const [loading, setLoading] = React.useState(false);
 
@@ -58,7 +60,9 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
           title: "Συνδεθείτε για να αποθηκεύσετε αγαπημένα",
           description: "Χρειάζεται σύνδεση για την προσθήκη οχημάτων στα αγαπημένα σας.",
         });
-        router.push(`/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`);
+        const loginHref = `/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`;
+        if (transition) transition.navigate(loginHref);
+        else router.push(loginHref);
         return;
       }
 
@@ -101,7 +105,7 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
         });
       }
     },
-    [favoriteIds, status, router],
+    [favoriteIds, status, router, transition],
   );
 
   const value = React.useMemo(

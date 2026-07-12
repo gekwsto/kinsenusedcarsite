@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import Image from "next/image";
+import { NavigationLink as Link } from "@/components/navigation/navigation-link";
 import { useSession, signOut } from "next-auth/react";
 import { Heart, User, LogOut, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";

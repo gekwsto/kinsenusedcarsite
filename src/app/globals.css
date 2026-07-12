@@ -4,8 +4,21 @@
 
 /* --font-sans is set by next/font/google (Manrope) via a className variable on <html> in layout.tsx */
 
+:root {
+  /* Sticky site header height (4rem, see src/components/layout/header.tsx's
+     `h-16`) plus the page's existing top gap (1rem). The one shared offset
+     used by both the `/vehicles` pagination scroll target and the sticky
+     filter sidebar (src/components/vehicles/vehicle-filters.tsx) so the two
+     can never drift out of sync with each other or with the header's real
+     height. */
+  --kinsen-header-offset: 5rem;
+}
+
 html {
   scroll-behavior: smooth;
+  /* Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(2, 56, 89, 0.32) transparent;
 }
 
 body {
@@ -13,8 +26,349 @@ body {
   color: #1e293b;
 }
 
+/* Chromium / Safari — restrained navy scrollbar, kept to the document root
+   only (not a blanket `*::-webkit-scrollbar`) so nested scroll containers
+   like dropdowns/modals keep their native, fully usable scrollbars. */
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+html::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+html::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb {
+  background-color: rgba(2, 56, 89, 0.28);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+html::-webkit-scrollbar-thumb:hover,
+body::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(2, 56, 89, 0.42);
+}
+
 @layer utilities {
   .container-page {
     @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  /* `/vehicles` only — the results grid is the primary focus of that page
+     and benefits from substantially more width than the site's standard
+     1280px `.container-page`. Scoped to this one class (not a change to
+     `.container-page` itself) so every other page's layout is untouched. */
+  .container-vehicles {
+    width: 100%;
+    max-width: 1600px;
+    margin-inline: auto;
+    padding-inline: clamp(1.5rem, 2.2vw, 2.375rem);
+  }
+}
+
+/* Entrance transition for the `/vehicles` filter sidebar's dynamic
+   active-filters summary (src/components/vehicles/vehicle-filters.tsx).
+   Conditionally rendered (mounts only once a filter is active), so only an
+   entrance is defined — removal is instant, which the spec for this
+   treatment explicitly allows. No exit-transition state machine, no
+   animation library. */
+@keyframes kinsen-active-filters-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.kinsen-active-filters-box {
+  animation: kinsen-active-filters-in 200ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kinsen-active-filters-box {
+    animation: none;
+  }
+}
+
+/* ==========================================================================
+   Kinsen NavigationLoader — single source of truth for the shared
+   route-navigation overlay (src/components/layout/navigation-loader.tsx),
+   rendered exclusively by NavigationTransitionProvider. Scoped entirely to
+   the `.kinsen-navigation-loader*` classes below; no equivalent animation
+   exists in tailwind.config.ts.
+   ========================================================================== */
+
+.kinsen-navigation-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background-color: rgba(245, 247, 250, 0.78);
+  /* Not `cursor: progress` — browsers render that as a small spinning
+     indicator glued to the pointer, which lands right on top of whatever
+     was just clicked (e.g. a nav link) since the mouse hasn't moved. That
+     reads as a second, competing loading indicator next to the branded one,
+     even though it's not a DOM element at all. `default` still keeps
+     pointer-events blocked below via pointer-events: auto. */
+  cursor: default;
+  pointer-events: auto;
+  opacity: 0;
+  transition: opacity 110ms ease-out;
+}
+
+.kinsen-navigation-loader[data-state="visible"] {
+  opacity: 1;
+}
+
+.kinsen-navigation-loader[data-state="exiting"] {
+  opacity: 0;
+  pointer-events: none;
+  transition-duration: 120ms;
+}
+
+.kinsen-navigation-loader__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  opacity: 0;
+  transform: translateY(3px);
+  transition: opacity 110ms ease-out, transform 110ms ease-out;
+}
+
+.kinsen-navigation-loader[data-state="visible"] .kinsen-navigation-loader__content {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.kinsen-navigation-loader[data-state="exiting"] .kinsen-navigation-loader__content {
+  opacity: 0;
+  transition-duration: 120ms;
+}
+
+.kinsen-navigation-loader__logo {
+  height: auto;
+  width: 104px;
+  animation: kinsen-navigation-loader-breathe 2.4s ease-in-out infinite;
+}
+
+@media (min-width: 640px) {
+  .kinsen-navigation-loader__logo {
+    width: 116px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .kinsen-navigation-loader__logo {
+    width: 128px;
+  }
+}
+
+.kinsen-navigation-loader__track {
+  position: relative;
+  height: 2px;
+  width: 120px;
+  overflow: hidden;
+  border-radius: 9999px;
+  background-color: rgba(2, 56, 89, 0.1);
+}
+
+.kinsen-navigation-loader__bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 40%;
+  border-radius: 9999px;
+  background-color: #39c0c3;
+  animation: kinsen-navigation-loader-progress 1.6s ease-in-out infinite;
+}
+
+@keyframes kinsen-navigation-loader-breathe {
+  0%,
+  100% {
+    transform: scale(0.995);
+    opacity: 0.96;
+  }
+  50% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes kinsen-navigation-loader-progress {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0.85;
+  }
+  50% {
+    transform: translate3d(150%, 0, 0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kinsen-navigation-loader,
+  .kinsen-navigation-loader__content {
+    transition: none;
+  }
+  .kinsen-navigation-loader__logo,
+  .kinsen-navigation-loader__bar {
+    animation: none;
+  }
+}
+
+/* Interest-modal internal scroll region (src/components/vehicles/interest-modal.tsx)
+   only — content stays fully scrollable by mouse wheel, trackpad, touch and
+   keyboard, just without a visible scrollbar track/thumb. Scoped to this one
+   class, not a global `*::-webkit-scrollbar` override, so it never touches
+   the document scrollbar styled above or any other scroll container. */
+.kinsen-modal-scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.kinsen-modal-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+/* Independent, sticky scroll region for the desktop `/vehicles` filter
+   sidebar (src/components/vehicles/vehicle-filters.tsx) only. Purely
+   native overflow + overscroll-behavior — no JS wheel/scroll-locking
+   listeners — so wheel, trackpad, touch and keyboard scrolling all behave
+   exactly as the browser already does for any scrollable region; this
+   class only changes how the scrollbar looks and stops the gesture from
+   chaining into the document once the panel is fully scrolled. Deliberately
+   a thinner, more understated thumb than the document scrollbar above (6px
+   vs 8px, lower opacity), and never teal — it's a UI chrome detail, not the
+   brand accent. */
+.vehicle-filters-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(2, 56, 89, 0.26) transparent;
+  scrollbar-gutter: stable;
+  overscroll-behavior-y: contain;
+}
+
+.vehicle-filters-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.vehicle-filters-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.vehicle-filters-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(2, 56, 89, 0.22);
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+
+.vehicle-filters-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(2, 56, 89, 0.36);
+}
+
+/* ==========================================================================
+   Kinsen price range slider (src/components/vehicles/price-range-slider.tsx)
+   — two native <input type="range"> elements stacked in one relative
+   container. Each input's own track is made fully transparent and given
+   `pointer-events: none` so the shared custom track underneath (rendered by
+   the component itself) is the only thing visible; pointer-events is then
+   re-enabled on just the thumb pseudo-element, so a click only ever grabs a
+   thumb — never ambiguously "the track of whichever input happens to be on
+   top". Scoped entirely to `.kinsen-price-slider`; no other range input in
+   the app is affected.
+   ========================================================================== */
+
+.kinsen-price-slider input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  margin: 0;
+  pointer-events: none;
+}
+
+.kinsen-price-slider input[type="range"]:focus-visible {
+  outline: none;
+}
+
+.kinsen-price-slider input[type="range"]::-webkit-slider-runnable-track {
+  -webkit-appearance: none;
+  height: 100%;
+  background: transparent;
+}
+
+.kinsen-price-slider input[type="range"]::-moz-range-track {
+  height: 100%;
+  background: transparent;
+  border: none;
+}
+
+.kinsen-price-slider input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  pointer-events: auto;
+  width: 22px;
+  height: 22px;
+  margin-top: 0;
+  border-radius: 9999px;
+  background-color: #ffffff;
+  border: 3px solid #023859;
+  box-shadow: 0 1px 3px rgba(2, 56, 89, 0.35);
+  cursor: pointer;
+  transition: transform 120ms ease-out, border-color 120ms ease-out;
+}
+
+.kinsen-price-slider input[type="range"]::-moz-range-thumb {
+  pointer-events: auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  background-color: #ffffff;
+  border: 3px solid #023859;
+  box-shadow: 0 1px 3px rgba(2, 56, 89, 0.35);
+  cursor: pointer;
+  transition: transform 120ms ease-out, border-color 120ms ease-out;
+}
+
+.kinsen-price-slider input[type="range"]:hover::-webkit-slider-thumb,
+.kinsen-price-slider input[type="range"]:focus-visible::-webkit-slider-thumb {
+  border-color: #39c0c3;
+  transform: scale(1.08);
+}
+
+.kinsen-price-slider input[type="range"]:hover::-moz-range-thumb,
+.kinsen-price-slider input[type="range"]:focus-visible::-moz-range-thumb {
+  border-color: #39c0c3;
+  transform: scale(1.08);
+}
+
+.kinsen-price-slider input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px rgba(57, 192, 195, 0.28), 0 1px 3px rgba(2, 56, 89, 0.35);
+}
+
+.kinsen-price-slider input[type="range"]:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 4px rgba(57, 192, 195, 0.28), 0 1px 3px rgba(2, 56, 89, 0.35);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kinsen-price-slider input[type="range"]::-webkit-slider-thumb,
+  .kinsen-price-slider input[type="range"]::-moz-range-thumb {
+    transition: none;
   }
 }

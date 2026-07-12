@@ -18,7 +18,13 @@ export function serializeVehicle(vehicle: Vehicle & { images?: VehicleImage[] })
 
 const PUBLIC_WHERE: Prisma.VehicleWhereInput = { froze: false, isDeleted: false };
 
-function buildPublicFilterWhere(filters: VehicleFilterInput): Prisma.VehicleWhereInput {
+// Exported (not just used internally) so its dynamic-value behavior —
+// notably that maker/fuel/transmissionType/color/typeOfCar are passed
+// straight through as Prisma `in`/`equals` field *values*, never used to
+// build allowlists or field names — is directly unit-testable without a
+// live database connection. See
+// src/server/services/__tests__/vehicle-filter-query.test.ts.
+export function buildPublicFilterWhere(filters: VehicleFilterInput): Prisma.VehicleWhereInput {
   const where: Prisma.VehicleWhereInput = { ...PUBLIC_WHERE };
 
   // maker/fuel accept a comma-separated list of values from the sidebar's
@@ -94,23 +100,48 @@ function buildPublicFilterWhere(filters: VehicleFilterInput): Prisma.VehicleWher
   return where;
 }
 
-function buildOrderBy(sort: VehicleFilterInput["sort"]): Prisma.VehicleOrderByWithRelationInput {
+// One explicit, fully-typed allowlist mapping every canonical `sort` value
+// to a trusted Prisma `orderBy`. Never build the ordering from the raw
+// query-string value directly — an invalid value can't reach this map at
+// all (vehicleSortEnum already rejects it upstream, see vehicle.schema.ts),
+// and this switch's own `default` case is a second, redundant safety net
+// rather than the only one.
+//
+// Every entry ends with `{ id: "asc" }` as a stable secondary key: `price`,
+// `km` and `cc` are not unique, so without a deterministic tie-breaker,
+// vehicles sharing a value could reorder between two requests for the same
+// page (Postgres makes no row-order guarantee among ties), shifting items
+// across pagination boundaries unpredictably.
+//
+// `nulls: "last"` on every directional numeric sort means a vehicle with no
+// recorded price/km/cc is never mistaken for the cheapest/lowest-mileage/
+// smallest-engine result — it always sorts after every vehicle with a real
+// value, in both the ascending and descending case, rather than the
+// database's default per-direction null placement (Postgres: NULLS LAST
+// for ASC, NULLS FIRST for DESC — which would otherwise put missing values
+// first for "highest price").
+function buildOrderBy(sort: VehicleFilterInput["sort"]): Prisma.VehicleOrderByWithRelationInput[] {
   switch (sort) {
-    case "price_asc":
-      return { price: "asc" };
-    case "price_desc":
-      return { price: "desc" };
-    case "monthly_asc":
-      return { monthlyPrice: "asc" };
-    case "monthly_desc":
-      return { monthlyPrice: "desc" };
-    case "year_desc":
-      return { yearRelease: "desc" };
-    case "km_asc":
-      return { km: "asc" };
-    case "newest":
+    case "price-desc":
+      return [{ price: { sort: "desc", nulls: "last" } }, { id: "asc" }];
+    case "price-asc":
+      return [{ price: { sort: "asc", nulls: "last" } }, { id: "asc" }];
+    case "mileage-asc":
+      return [{ km: { sort: "asc", nulls: "last" } }, { id: "asc" }];
+    case "mileage-desc":
+      return [{ km: { sort: "desc", nulls: "last" } }, { id: "asc" }];
+    case "engine-asc":
+      return [{ cc: { sort: "asc", nulls: "last" } }, { id: "asc" }];
+    case "engine-desc":
+      return [{ cc: { sort: "desc", nulls: "last" } }, { id: "asc" }];
+    case "recommended":
     default:
-      return { createdAt: "desc" };
+      // Existing default business order (newest listings first) — the same
+      // ordering the plain `newest` sort always used, just now living
+      // under the "recommended" name. No featured/offer-first ranking is
+      // currently implemented, so there is no additional business rule to
+      // preserve beyond this.
+      return [{ createdAt: "desc" }, { id: "asc" }];
   }
 }
 
@@ -172,12 +203,18 @@ export async function getFeaturedVehicles(limit = 6) {
 }
 
 export async function getPublicFilterOptions() {
-  const [makers, colors, types, fuels, transmissions] = await Promise.all([
+  const [makers, colors, types, fuels, transmissions, offerCount] = await Promise.all([
     prisma.vehicle.findMany({ where: PUBLIC_WHERE, select: { maker: true }, distinct: ["maker"] }),
     prisma.vehicle.findMany({ where: PUBLIC_WHERE, select: { color: true }, distinct: ["color"] }),
     prisma.vehicle.findMany({ where: PUBLIC_WHERE, select: { typeOfCar: true }, distinct: ["typeOfCar"] }),
     prisma.vehicle.findMany({ where: PUBLIC_WHERE, select: { fuel: true }, distinct: ["fuel"] }),
     prisma.vehicle.findMany({ where: PUBLIC_WHERE, select: { transmissionType: true }, distinct: ["transmissionType"] }),
+    // Authoritative availability check for the "Deals" filter (the `offer`
+    // Boolean field — see buildPublicFilterWhere's `filters.offerOnly`
+    // branch below) — same "hide the whole section when the option set is
+    // empty" policy already applied to maker/fuel/transmission/color/type
+    // above, extended to this one boolean facet.
+    prisma.vehicle.count({ where: { ...PUBLIC_WHERE, offer: true } }),
   ]);
 
   return {
@@ -186,6 +223,7 @@ export async function getPublicFilterOptions() {
     typesOfCar: types.map((t) => t.typeOfCar).filter(Boolean).sort() as string[],
     fuels: fuels.map((f) => f.fuel).filter(Boolean).sort() as string[],
     transmissions: transmissions.map((t) => t.transmissionType).filter(Boolean).sort() as string[],
+    hasOffers: offerCount > 0,
   };
 }
 

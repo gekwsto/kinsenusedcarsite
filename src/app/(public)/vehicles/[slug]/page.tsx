@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { VehicleGallery } from "@/components/vehicles/vehicle-gallery";
 import { FavoriteButton } from "@/components/vehicles/favorite-button";
-import { InterestModal } from "@/components/vehicles/interest-modal";
+import { InterestModalProvider, InterestModalTrigger } from "@/components/vehicles/interest-modal";
 import { VehicleGrid } from "@/components/vehicles/vehicle-grid";
 import { getPublicVehicleBySlug, getSimilarVehicles } from "@/server/services/vehicle.service";
 import { resolveVehicleImages, resolveVehicleImagesForList } from "@/server/services/vehicle-image.service";
@@ -100,6 +100,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<Pa
   };
 
   return (
+    <InterestModalProvider vehicleId={vehicle.id} vehicleLabel={vehicleLabel}>
     <div className="container-page py-8">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
@@ -173,33 +174,19 @@ export default async function VehicleDetailPage({ params }: { params: Promise<Pa
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <InterestModal
+                <InterestModalTrigger
                   interestType="LEASING"
-                  vehicleId={vehicle.id}
-                  vehicleLabel={vehicleLabel}
-                  trigger={
-                    <button
-                      type="button"
-                      className="flex w-full items-center justify-center gap-3 rounded-lg border border-detail bg-detail px-4 py-3.5 text-sm font-extrabold text-white transition-colors hover:bg-[#004c74]"
-                    >
-                      Ενδιαφέρομαι για Leasing <ArrowRight className="h-4 w-4" />
-                    </button>
-                  }
-                />
+                  className="flex w-full items-center justify-center gap-3 rounded-lg border border-detail bg-detail px-4 py-3.5 text-sm font-extrabold text-white transition-colors hover:bg-[#004c74]"
+                >
+                  Ενδιαφέρομαι για Leasing <ArrowRight className="h-4 w-4" />
+                </InterestModalTrigger>
                 {isForSale && (
-                  <InterestModal
+                  <InterestModalTrigger
                     interestType="GENERAL"
-                    vehicleId={vehicle.id}
-                    vehicleLabel={vehicleLabel}
-                    trigger={
-                      <button
-                        type="button"
-                        className="flex w-full items-center justify-center gap-3 rounded-lg border border-detail bg-detail px-4 py-3.5 text-sm font-extrabold text-white transition-colors hover:bg-[#004c74]"
-                      >
-                        Ενδιαφέρομαι για Πώληση <ArrowRight className="h-4 w-4" />
-                      </button>
-                    }
-                  />
+                    className="flex w-full items-center justify-center gap-3 rounded-lg border border-detail bg-detail px-4 py-3.5 text-sm font-extrabold text-white transition-colors hover:bg-[#004c74]"
+                  >
+                    Ενδιαφέρομαι για Πώληση <ArrowRight className="h-4 w-4" />
+                  </InterestModalTrigger>
                 )}
               </div>
             </div>
@@ -224,24 +211,23 @@ export default async function VehicleDetailPage({ params }: { params: Promise<Pa
 
       {/* Secondary actions kept for LEASING app functionality beyond the reference (financing / test drive / general question) */}
       <div className="mx-auto mt-4 flex max-w-[1200px] flex-wrap justify-center gap-3">
-        <InterestModal
-          interestType="FINANCING"
-          vehicleId={vehicle.id}
-          vehicleLabel={vehicleLabel}
-          trigger={<Button variant="outline">Ενδιαφέρομαι για Δανειοδότηση</Button>}
-        />
-        <InterestModal
-          interestType="TEST_DRIVE"
-          vehicleId={vehicle.id}
-          vehicleLabel={vehicleLabel}
-          trigger={<Button variant="outline">Κλείστε Test Drive</Button>}
-        />
-        <InterestModal
-          interestType="GENERAL"
-          vehicleId={vehicle.id}
-          vehicleLabel={vehicleLabel}
-          trigger={<Button variant="ghost">Ρωτήστε μας για αυτό το όχημα</Button>}
-        />
+        <InterestModalTrigger interestType="FINANCING" asChild>
+          <Button variant="outline">Ενδιαφέρομαι για Δανειοδότηση</Button>
+        </InterestModalTrigger>
+        <InterestModalTrigger interestType="TEST_DRIVE" asChild>
+          <Button variant="outline">Κλείστε Test Drive</Button>
+        </InterestModalTrigger>
+        <InterestModalTrigger interestType="GENERAL" asChild>
+          <Button variant="ghost" className="group">
+            <span className="relative inline-block origin-left transition-transform duration-[340ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-safe:group-hover:scale-[1.015] motion-safe:group-focus-visible:scale-[1.015]">
+              Ρωτήστε μας για αυτό το όχημα
+              <span
+                aria-hidden="true"
+                className="absolute bottom-[-4px] left-0 h-[2px] w-full origin-left scale-x-0 rounded-full bg-accent opacity-0 transition-[transform,opacity] duration-[320ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none group-hover:scale-x-100 group-hover:opacity-[0.78] group-focus-visible:scale-x-100 group-focus-visible:opacity-[0.78]"
+              />
+            </span>
+          </Button>
+        </InterestModalTrigger>
       </div>
 
       {similarVehicles.length > 0 && (
@@ -249,10 +235,11 @@ export default async function VehicleDetailPage({ params }: { params: Promise<Pa
           <Separator className="my-10" />
           <div>
             <h2 className="mb-5 text-xl font-semibold text-ink">Παρόμοια οχήματα</h2>
-            <VehicleGrid vehicles={similarVehicles} />
+            <VehicleGrid vehicles={similarVehicles} cardVariant="related" />
           </div>
         </>
       )}
     </div>
+    </InterestModalProvider>
   );
 }

@@ -5,7 +5,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { signIn, getSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
+import { NavigationLink as Link } from "@/components/navigation/navigation-link";
+import { useNavigationTransition } from "@/components/providers/navigation-transition-provider";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +16,7 @@ import { loginSchema, type LoginInput } from "@/lib/validators/auth.schema";
 
 export function LoginForm() {
   const router = useRouter();
+  const transition = useNavigationTransition();
   const searchParams = useSearchParams();
   const explicitCallbackUrl = searchParams.get("callbackUrl");
   const registered = searchParams.get("registered") === "1";
@@ -32,6 +34,11 @@ export function LoginForm() {
     defaultValues: { email: "", password: "" },
   });
 
+  // Routes the post-login redirect through the shared navigation loader when
+  // available, falling back to a plain router.push (still fully functional,
+  // just without the overlay) if this ever renders outside the provider.
+  const goTo = (href: string) => (transition ? transition.navigate(href) : router.push(href));
+
   const onSubmit = async (values: LoginInput) => {
     setSubmitting(true);
     setError(null);
@@ -44,12 +51,18 @@ export function LoginForm() {
       return;
     }
 
+    // Hand off to the shared navigation loader right as each redirect is
+    // triggered, rather than leaving this form's own spinner running
+    // underneath it — the overlay is the single loading indicator for the
+    // destination that's about to load.
     if (explicitCallbackUrl) {
-      router.push(explicitCallbackUrl);
+      setSubmitting(false);
+      goTo(explicitCallbackUrl);
     } else {
       const session = await getSession();
       const isAdmin = session?.user?.role === "ADMIN" || session?.user?.role === "SUPER_ADMIN";
-      router.push(isAdmin ? "/admin" : "/account");
+      setSubmitting(false);
+      goTo(isAdmin ? "/admin" : "/account");
     }
     router.refresh();
   };

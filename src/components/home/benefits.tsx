@@ -1,5 +1,5 @@
 import Image from "next/image";
-import Link from "next/link";
+import { NavigationLink as Link } from "@/components/navigation/navigation-link";
 import { getPageContent } from "@/server/services/content.service";
 
 const CARD_IMAGES = ["/images/kinsencar.png", "/images/hondaphoto.jpg", "/images/couple.jpg"];

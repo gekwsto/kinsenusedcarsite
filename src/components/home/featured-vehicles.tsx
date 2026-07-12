@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { NavigationLink as Link } from "@/components/navigation/navigation-link";
 import { ArrowRight } from "lucide-react";
 import { VehicleGrid } from "@/components/vehicles/vehicle-grid";
 import { getFeaturedVehicles } from "@/server/services/vehicle.service";
@@ -18,7 +18,7 @@ export async function FeaturedVehicles() {
           Δείτε όλα <ArrowRight className="h-4 w-4" />
         </Link>
       </div>
-      <VehicleGrid vehicles={resolvedVehicles} />
+      <VehicleGrid vehicles={resolvedVehicles} cardVariant="featured" />
     </section>
   );
 }

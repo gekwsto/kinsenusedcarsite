@@ -47,19 +47,64 @@ export const vehicleAdminUpdateSchema = vehicleAdminSchema
 
 export type VehicleAdminUpdateInput = z.infer<typeof vehicleAdminUpdateSchema>;
 
+// "recommended" preserves the existing default business ordering (newest
+// listings first — see buildOrderBy in vehicle.service.ts) under a
+// URL-neutral name; the other six are the explicit numeric sort directions
+// the /vehicles results toolbar exposes. A missing `sort` param resolves to
+// "recommended" via `.default(...)` below; an unrecognized one (a stale
+// bookmark using the old `price_asc`-style names, or a malformed external
+// URL) fails enum validation, which — via the existing whole-object
+// safeParse-then-fallback pattern in vehicles/page.tsx — safely resets the
+// full filter set to defaults rather than ever producing a server error.
 export const vehicleSortEnum = z.enum([
-  "newest",
-  "price_asc",
-  "price_desc",
-  "monthly_asc",
-  "monthly_desc",
-  "year_desc",
-  "km_asc",
+  "recommended",
+  "price-desc",
+  "price-asc",
+  "mileage-asc",
+  "mileage-desc",
+  "engine-asc",
+  "engine-desc",
 ]);
 
+export type VehicleSort = z.infer<typeof vehicleSortEnum>;
+
+// One centralized business-level price-filter range, shared by the client
+// slider UI (src/components/vehicles/price-range-slider.tsx) and this
+// schema's own clamping below, so the UI can never offer a value the
+// server would treat differently. A direct URL with an out-of-range value
+// (`?maxPrice=999999`, `?minPrice=-100`) is clamped into range rather than
+// rejected — rejecting would fail the *entire* filter object under the
+// existing whole-object safeParse-then-fallback pattern (see
+// vehicles/page.tsx), silently discarding unrelated valid filters over one
+// out-of-range number, which clamping avoids.
+export const VEHICLE_PRICE_FILTER_MIN = 0;
+export const VEHICLE_PRICE_FILTER_MAX = 50_000;
+export const VEHICLE_PRICE_FILTER_STEP = 500;
+
+// Single source of truth for the year/mileage/cc/hp dropdown option
+// boundaries (src/components/vehicles/numeric-range-select.tsx, fed via
+// createNumericRange in src/lib/numeric-range.ts). Unlike
+// VEHICLE_PRICE_FILTER_MIN/MAX above, these are *not* a hard clamp on the
+// query value — they only bound which choices the dropdowns offer. A
+// direct URL outside this range (e.g. `?minMileage=5000`, below the
+// 10,000 dropdown floor) is still honored as-is by the server query; see
+// buildPublicFilterWhere in vehicle.service.ts, which has never clamped
+// these four fields and isn't changed by this config's introduction.
+export const VEHICLE_FILTER_RANGES = {
+  year: { min: 2010, max: 2026, step: 1 },
+  mileage: { min: 10_000, max: 250_000, step: 10_000 },
+  engineCc: { min: 1_000, max: 2_500, step: 100 },
+  horsepower: { min: 80, max: 250, step: 10 },
+} as const;
+
+function clampPrice(value: number | undefined): number | undefined {
+  if (value === undefined) return undefined;
+  return Math.min(VEHICLE_PRICE_FILTER_MAX, Math.max(VEHICLE_PRICE_FILTER_MIN, value));
+}
+
 export const vehicleFilterSchema = z.object({
-  priceMin: z.coerce.number().optional(),
-  priceMax: z.coerce.number().optional(),
+  priceMin: z.coerce.number().optional().transform(clampPrice),
+  priceMax: z.coerce.number().optional().transform(clampPrice),
   monthlyPriceMin: z.coerce.number().optional(),
   monthlyPriceMax: z.coerce.number().optional(),
   maker: z.string().optional(),
@@ -79,7 +124,7 @@ export const vehicleFilterSchema = z.object({
   offerOnly: z.coerce.boolean().optional(),
   availableOnly: z.coerce.boolean().optional(),
   search: z.string().optional(),
-  sort: vehicleSortEnum.optional().default("newest"),
+  sort: vehicleSortEnum.optional().default("recommended"),
   page: z.coerce.number().int().min(1).optional().default(1),
   pageSize: z.coerce.number().int().min(1).max(48).optional().default(12),
 });

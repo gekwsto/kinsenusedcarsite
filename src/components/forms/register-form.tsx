@@ -4,7 +4,8 @@ import * as React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { NavigationLink as Link } from "@/components/navigation/navigation-link";
+import { useNavigationTransition } from "@/components/providers/navigation-transition-provider";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +16,7 @@ import { registerAction } from "@/app/(public)/register/actions";
 
 export function RegisterForm() {
   const router = useRouter();
+  const transition = useNavigationTransition();
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -51,7 +53,13 @@ export function RegisterForm() {
       return;
     }
 
-    router.push("/login?registered=1");
+    // Hand off to the shared navigation loader now rather than leaving this
+    // form's own spinner running underneath it — the overlay is the single
+    // loading indicator for the destination that's about to load.
+    setSubmitting(false);
+
+    if (transition) transition.navigate("/login?registered=1");
+    else router.push("/login?registered=1");
   };
 
   return (

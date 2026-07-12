@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import * as SelectPrimitive from "@radix-ui/react-select";
-import { Check, ChevronDown } from "lucide-react";
+import { Check, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const Select = SelectPrimitive.Root;
@@ -29,6 +29,39 @@ const SelectTrigger = React.forwardRef<
 ));
 SelectTrigger.displayName = "SelectTrigger";
 
+// Radix's own ScrollUpButton/ScrollDownButton — not a manually-tracked
+// scroll-position system — render exactly when scrolling in that direction
+// is actually possible, and disappear the instant the viewport reaches
+// that edge. Undecorated by default, so all sizing/color below is this
+// repo's own styling on top of Radix's built-in show/hide logic.
+const SelectScrollUpButton = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.ScrollUpButton>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.ScrollUpButton>
+>(({ className, ...props }, ref) => (
+  <SelectPrimitive.ScrollUpButton
+    ref={ref}
+    className={cn("flex h-7 cursor-default items-center justify-center bg-white text-primary/60", className)}
+    {...props}
+  >
+    <ChevronUp className="h-4 w-4" aria-hidden="true" />
+  </SelectPrimitive.ScrollUpButton>
+));
+SelectScrollUpButton.displayName = SelectPrimitive.ScrollUpButton.displayName;
+
+const SelectScrollDownButton = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.ScrollDownButton>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.ScrollDownButton>
+>(({ className, ...props }, ref) => (
+  <SelectPrimitive.ScrollDownButton
+    ref={ref}
+    className={cn("flex h-7 cursor-default items-center justify-center bg-white text-primary/60", className)}
+    {...props}
+  >
+    <ChevronDown className="h-4 w-4" aria-hidden="true" />
+  </SelectPrimitive.ScrollDownButton>
+));
+SelectScrollDownButton.displayName = SelectPrimitive.ScrollDownButton.displayName;
+
 const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
@@ -38,13 +71,21 @@ const SelectContent = React.forwardRef<
       ref={ref}
       position={position}
       className={cn(
-        "z-50 max-h-72 min-w-[8rem] overflow-hidden rounded-lg border border-border bg-white shadow-card animate-fade-in",
+        // A fixed 300px desktop ceiling (within the 240–320px comfortable
+        // range) wrapped in min() against Radix's own
+        // --radix-select-content-available-height custom property — the
+        // documented, built-in way to keep the menu from ever extending
+        // past the actual viewport on a short screen, without any manual
+        // viewport math.
+        "z-50 max-h-[min(300px,var(--radix-select-content-available-height))] min-w-[8rem] overflow-hidden rounded-lg border border-border bg-white shadow-card animate-fade-in",
         position === "popper" && "translate-y-1",
         className,
       )}
       {...props}
     >
+      <SelectScrollUpButton />
       <SelectPrimitive.Viewport className="p-1">{children}</SelectPrimitive.Viewport>
+      <SelectScrollDownButton />
     </SelectPrimitive.Content>
   </SelectPrimitive.Portal>
 ));
@@ -72,4 +113,4 @@ const SelectItem = React.forwardRef<
 ));
 SelectItem.displayName = "SelectItem";
 
-export { Select, SelectGroup, SelectValue, SelectTrigger, SelectContent, SelectItem };
+export { Select, SelectGroup, SelectValue, SelectTrigger, SelectContent, SelectScrollUpButton, SelectScrollDownButton, SelectItem };
