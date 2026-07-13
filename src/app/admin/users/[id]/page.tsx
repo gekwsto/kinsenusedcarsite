@@ -22,11 +22,11 @@ export default async function UserDetailPage({ params }: UserDetailPageProps) {
     where: { id },
     include: {
       favorites: {
-        include: { vehicle: { select: { id: true, maker: true, model: true, slug: true, price: true } } },
+        include: { vehicle: { select: { id: true, maker: true, versionName: true, slug: true, price: true } } },
         orderBy: { createdAt: "desc" },
       },
       leads: {
-        include: { vehicle: { select: { id: true, maker: true, model: true, slug: true } } },
+        include: { vehicle: { select: { id: true, maker: true, versionName: true, slug: true } } },
         orderBy: { createdAt: "desc" },
       },
     },
@@ -86,7 +86,7 @@ export default async function UserDetailPage({ params }: UserDetailPageProps) {
                 <tr key={fav.id} className="border-b border-border last:border-0">
                   <td className="px-5 py-3">
                     <Link href={`/admin/vehicles/${fav.vehicle.id}`} className="text-primary hover:underline">
-                      {fav.vehicle.maker} {fav.vehicle.model}
+                      {fav.vehicle.maker} {fav.vehicle.versionName}
                     </Link>
                   </td>
                   <td className="px-5 py-3">{formatEuro(fav.vehicle.price?.toString() ?? null)}</td>
@@ -126,7 +126,7 @@ export default async function UserDetailPage({ params }: UserDetailPageProps) {
                   </td>
                   <td className="px-5 py-3">{lead.interestType}</td>
                   <td className="px-5 py-3">
-                    {lead.vehicle ? `${lead.vehicle.maker} ${lead.vehicle.model}` : "-"}
+                    {lead.vehicle ? `${lead.vehicle.maker} ${lead.vehicle.versionName}` : "-"}
                   </td>
                   <td className="px-5 py-3">
                     <Badge variant="muted">{lead.status}</Badge>

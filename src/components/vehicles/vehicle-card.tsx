@@ -47,7 +47,7 @@ export interface VehicleCardVehicle {
   id: string;
   slug: string;
   maker: string;
-  model: string;
+  versionName: string;
   yearRelease?: number | null;
   price?: number | null;
   monthlyPrice?: number | null;
@@ -98,7 +98,7 @@ export function VehicleCard({
       <Link href={`/vehicles/${vehicle.slug}`} className="relative block h-[250px] w-full overflow-hidden bg-white">
         <Image
           src={mainImage}
-          alt={`${vehicle.maker} ${vehicle.model}`}
+          alt={`${vehicle.maker} ${vehicle.versionName}`}
           fill
           priority={priority}
           sizes="(min-width: 1024px) 25vw, (min-width: 640px) 45vw, 90vw"
@@ -111,7 +111,7 @@ export function VehicleCard({
 
       <Link href={`/vehicles/${vehicle.slug}`} className="flex flex-1 flex-col items-center gap-1.5 px-4 py-5 text-center">
         <h3 className="text-base font-semibold text-ink">
-          {vehicle.maker} {vehicle.model}
+          {vehicle.maker} {vehicle.versionName}
         </h3>
         <p className="text-sm text-ink-muted">{vehicle.yearRelease ?? 0}</p>
 

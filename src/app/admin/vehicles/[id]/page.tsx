@@ -21,7 +21,7 @@ export default async function EditVehiclePage({ params }: EditVehiclePageProps) 
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-semibold text-ink">
-        Επεξεργασία: {vehicle.maker} {vehicle.model}
+        Επεξεργασία: {vehicle.maker} {vehicle.versionName}
       </h1>
 
       <Card>
@@ -50,6 +50,7 @@ export default async function EditVehiclePage({ params }: EditVehiclePageProps) 
           externalCarId: vehicle.externalCarId,
           maker: vehicle.maker,
           model: vehicle.model,
+          versionName: vehicle.versionName,
           yearRelease: vehicle.yearRelease,
           price: vehicle.price,
           monthlyPrice: vehicle.monthlyPrice,

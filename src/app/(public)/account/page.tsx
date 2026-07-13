@@ -136,7 +136,7 @@ export default async function AccountPage() {
                     <td className="px-4 py-3 text-ink">
                       {lead.vehicle ? (
                         <Link href={`/vehicles/${lead.vehicle.slug}`} className="text-primary hover:underline">
-                          {lead.vehicle.maker} {lead.vehicle.model}
+                          {lead.vehicle.maker} {lead.vehicle.versionName}
                         </Link>
                       ) : (
                         "—"

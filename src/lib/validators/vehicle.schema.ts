@@ -7,6 +7,7 @@ export const vehicleAdminSchema = z.object({
   externalCarId: z.string().optional().nullable(),
   maker: z.string().min(1, "Ο κατασκευαστής είναι υποχρεωτικός"),
   model: z.string().min(1, "Το μοντέλο είναι υποχρεωτικό"),
+  versionName: z.string().min(1, "Η έκδοση είναι υποχρεωτική"),
   yearRelease: optionalInt,
   price: optionalNumber,
   monthlyPrice: optionalNumber,

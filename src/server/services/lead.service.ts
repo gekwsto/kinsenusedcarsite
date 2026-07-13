@@ -35,7 +35,7 @@ export async function listLeads(params: {
   const [items, total] = await Promise.all([
     prisma.lead.findMany({
       where,
-      include: { vehicle: { select: { id: true, maker: true, model: true, slug: true } } },
+      include: { vehicle: { select: { id: true, maker: true, versionName: true, slug: true } } },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize,
@@ -49,7 +49,7 @@ export async function listLeads(params: {
 export async function getLeadById(id: string) {
   return prisma.lead.findUnique({
     where: { id },
-    include: { vehicle: { select: { id: true, maker: true, model: true, slug: true } } },
+    include: { vehicle: { select: { id: true, maker: true, versionName: true, slug: true } } },
   });
 }
 
@@ -66,7 +66,7 @@ export async function updateLead(id: string, input: UpdateLeadInput) {
 export async function listLeadsForUser(userId: string) {
   return prisma.lead.findMany({
     where: { userId },
-    include: { vehicle: { select: { id: true, maker: true, model: true, slug: true } } },
+    include: { vehicle: { select: { id: true, maker: true, versionName: true, slug: true } } },
     orderBy: { createdAt: "desc" },
   });
 }
@@ -78,7 +78,7 @@ export async function exportLeadsToCsv(params: { status?: string; interestType?:
 
   const leads = await prisma.lead.findMany({
     where,
-    include: { vehicle: { select: { maker: true, model: true } } },
+    include: { vehicle: { select: { maker: true, versionName: true } } },
     orderBy: { createdAt: "desc" },
   });
 
@@ -107,7 +107,7 @@ export async function exportLeadsToCsv(params: { status?: string; interestType?:
       lead.lastName,
       lead.email,
       lead.phone ?? "",
-      lead.vehicle ? `${lead.vehicle.maker} ${lead.vehicle.model}` : "",
+      lead.vehicle ? `${lead.vehicle.maker} ${lead.vehicle.versionName}` : "",
       (lead.message ?? "").replace(/\n/g, " "),
     ]
       .map((cell) => escapeCsv(String(cell)))

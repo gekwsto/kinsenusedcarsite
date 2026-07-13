@@ -104,6 +104,11 @@ export function VehicleForm({ mode, vehicleId, slug, defaultValues }: VehicleFor
             <FieldError message={errors.model?.message} />
           </div>
           <div className="flex flex-col gap-1.5">
+            <Label htmlFor="versionName">Έκδοση *</Label>
+            <Input id="versionName" {...register("versionName")} />
+            <FieldError message={errors.versionName?.message} />
+          </div>
+          <div className="flex flex-col gap-1.5">
             <Label htmlFor="yearRelease">Έτος</Label>
             <Input id="yearRelease" type="number" {...numberField("yearRelease")} />
             <FieldError message={errors.yearRelease?.message} />

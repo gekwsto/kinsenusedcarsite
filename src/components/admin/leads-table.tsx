@@ -34,7 +34,7 @@ export interface LeadRow {
   interestType: string;
   status: string;
   internalNotes: unknown;
-  vehicle: { id: string; maker: string; model: string; slug: string } | null;
+  vehicle: { id: string; maker: string; versionName: string; slug: string } | null;
 }
 
 interface LeadsTableProps {
@@ -163,7 +163,7 @@ export function LeadsTable({ leads, page, totalPages, total }: LeadsTableProps) 
                 <td className="px-4 py-3">
                   {lead.vehicle ? (
                     <Link href={`/vehicles/${lead.vehicle.slug}`} target="_blank" className="text-primary hover:underline">
-                      {lead.vehicle.maker} {lead.vehicle.model}
+                      {lead.vehicle.maker} {lead.vehicle.versionName}
                     </Link>
                   ) : (
                     <span className="text-ink-muted">-</span>
@@ -240,7 +240,7 @@ export function LeadsTable({ leads, page, totalPages, total }: LeadsTableProps) 
                 <div>
                   <p className="text-xs uppercase text-ink-muted">Όχημα</p>
                   <p className="text-ink">
-                    {detailLead.vehicle ? `${detailLead.vehicle.maker} ${detailLead.vehicle.model}` : "-"}
+                    {detailLead.vehicle ? `${detailLead.vehicle.maker} ${detailLead.vehicle.versionName}` : "-"}
                   </p>
                 </div>
               </div>

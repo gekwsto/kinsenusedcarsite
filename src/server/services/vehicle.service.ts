@@ -325,6 +325,7 @@ function toVehicleData(input: VehicleAdminInput): Prisma.VehicleUncheckedCreateI
     externalCarId: input.externalCarId || null,
     maker: input.maker,
     model: input.model,
+    versionName: input.versionName,
     yearRelease: input.yearRelease ?? null,
     price: input.price ?? null,
     monthlyPrice: input.monthlyPrice ?? null,
@@ -359,6 +360,7 @@ function toVehicleUpdateData(input: VehicleAdminUpdateInput): Prisma.VehicleUnch
   if (input.externalCarId !== undefined) data.externalCarId = input.externalCarId || null;
   if (input.maker !== undefined) data.maker = input.maker;
   if (input.model !== undefined) data.model = input.model;
+  if (input.versionName !== undefined) data.versionName = input.versionName;
   if (input.yearRelease !== undefined) data.yearRelease = input.yearRelease;
   if (input.price !== undefined) data.price = input.price;
   if (input.monthlyPrice !== undefined) data.monthlyPrice = input.monthlyPrice;
@@ -441,6 +443,7 @@ export async function upsertVehicleFromStock(raw: CarStockPayloadItem) {
         ...stockDataFromNormalized(normalized),
         maker: normalized.maker ?? "Άγνωστο",
         model: normalized.model ?? externalCarId,
+        versionName: normalized.versionName ?? normalized.model ?? externalCarId,
       },
     });
     return { action: "created" as const };
@@ -495,7 +498,7 @@ function stockUpdateDataFromRaw(
 
   if (raw.maker !== undefined) data.maker = normalized.maker ?? undefined;
   if (raw.model !== undefined) data.model = normalized.model ?? undefined;
-  if (raw.versionName !== undefined) data.versionName = normalized.versionName;
+  if (raw.versionName !== undefined) data.versionName = normalized.versionName ?? undefined;
   if (raw.yearRelease !== undefined) data.yearRelease = normalized.yearRelease;
   if (raw.price !== undefined) data.price = normalized.price;
   if (raw.monthlyPrice !== undefined) data.monthlyPrice = normalized.monthlyPrice;
@@ -520,7 +523,7 @@ function stockDataFromNormalized(normalized: NormalizedVehicleInput) {
   return {
     maker: normalized.maker ?? undefined,
     model: normalized.model ?? undefined,
-    versionName: normalized.versionName,
+    versionName: normalized.versionName ?? normalized.model ?? undefined,
     yearRelease: normalized.yearRelease,
     price: normalized.price,
     monthlyPrice: normalized.monthlyPrice,

@@ -614,6 +614,9 @@ async function seedVehicles() {
         slug,
         maker: spec.maker,
         model: spec.model,
+        versionName: [spec.cc ? `${(spec.cc / 1000).toFixed(1)}` : null, spec.fuel, spec.transmissionType]
+          .filter(Boolean)
+          .join(" "),
         yearRelease: spec.yearRelease,
         price: spec.price,
         monthlyPrice: spec.monthlyPrice,

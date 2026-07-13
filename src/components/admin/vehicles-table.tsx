@@ -14,7 +14,7 @@ export interface VehicleRow {
   id: string;
   slug: string;
   maker: string;
-  model: string;
+  versionName: string;
   yearRelease: number | null;
   price: number | null;
   km: number | null;
@@ -120,7 +120,7 @@ export function VehiclesTable({ vehicles, page, totalPages, total }: VehiclesTab
             {vehicles.map((v) => (
               <tr key={v.id} className="border-b border-border last:border-0">
                 <td className="px-4 py-3 font-medium text-ink">
-                  {v.maker} {v.model}
+                  {v.maker} {v.versionName}
                 </td>
                 <td className="px-4 py-3">{v.yearRelease ?? "-"}</td>
                 <td className="px-4 py-3">{formatEuro(v.price)}</td>

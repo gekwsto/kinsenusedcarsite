@@ -34,11 +34,11 @@ export async function generateMetadata({ params }: { params: Promise<PageParams>
   const vehicle = await getPublicVehicleBySlug(slug);
   if (!vehicle) return {};
 
-  const title = `Used ${vehicle.maker} ${vehicle.model} ${vehicle.yearRelease ?? ""}`.replace(/\s+/g, " ").trim();
+  const title = `Used ${vehicle.maker} ${vehicle.versionName} ${vehicle.yearRelease ?? ""}`.replace(/\s+/g, " ").trim();
   const description =
     vehicle.seoDescription ||
     vehicle.description ||
-    `${vehicle.maker} ${vehicle.model}${vehicle.yearRelease ? ` ${vehicle.yearRelease}` : ""} — μεταχειρισμένο όχημα με leasing από την Kinsen.`;
+    `${vehicle.maker} ${vehicle.versionName}${vehicle.yearRelease ? ` ${vehicle.yearRelease}` : ""} — μεταχειρισμένο όχημα με leasing από την Kinsen.`;
   const resolved = await resolveVehicleImages(vehicle);
   const image = resolved.mainImage.url;
 
@@ -65,12 +65,12 @@ export default async function VehicleDetailPage({ params }: { params: Promise<Pa
     resolveVehicleImages(vehicle),
   ]);
   const similarVehicles = await resolveVehicleImagesForList(similarVehiclesRaw);
-  const vehicleLabel = `${vehicle.maker} ${vehicle.model}${vehicle.yearRelease ? ` ${vehicle.yearRelease}` : ""}`;
+  const vehicleLabel = `${vehicle.maker} ${vehicle.versionName}${vehicle.yearRelease ? ` ${vehicle.yearRelease}` : ""}`;
   const isForSale = vehicle.price !== null;
 
   const specs: { icon: typeof Car; label: string; value: string }[] = [
     { icon: Car, label: "Μάρκα", value: vehicle.maker || "-" },
-    { icon: CarFront, label: "Μοντέλο", value: vehicle.model || "-" },
+    { icon: CarFront, label: "Μοντέλο", value: vehicle.versionName || "-" },
     { icon: Shapes, label: "Κατηγορία", value: vehicle.typeOfCar || "-" },
     { icon: Fuel, label: "Καύσιμο", value: vehicle.fuel || "-" },
     { icon: Cog, label: "Κιβώτιο", value: vehicle.transmissionType || "-" },
@@ -85,7 +85,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<Pa
     "@type": "Vehicle",
     name: vehicleLabel,
     brand: vehicle.maker,
-    model: vehicle.model,
+    model: vehicle.versionName,
     vehicleModelDate: vehicle.yearRelease ? String(vehicle.yearRelease) : undefined,
     fuelType: vehicle.fuel ?? undefined,
     vehicleTransmission: vehicle.transmissionType ?? undefined,

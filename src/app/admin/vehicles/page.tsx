@@ -53,7 +53,7 @@ export default async function AdminVehiclesPage({ searchParams }: AdminVehiclesP
           id: v.id,
           slug: v.slug,
           maker: v.maker,
-          model: v.model,
+          versionName: v.versionName,
           yearRelease: v.yearRelease,
           price: v.price,
           km: v.km,

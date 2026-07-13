@@ -141,7 +141,7 @@ export default async function AdminDashboardPage() {
                   <tr key={vehicle.id} className="border-b border-border last:border-0">
                     <td className="px-5 py-3">
                       <Link href={`/admin/vehicles/${vehicle.id}`} className="text-primary hover:underline">
-                        {vehicle.maker} {vehicle.model}
+                        {vehicle.maker} {vehicle.versionName}
                       </Link>
                     </td>
                     <td className="px-5 py-3 text-ink-muted">

@@ -68,7 +68,7 @@ model Vehicle {
 
   maker            String
   model            String
-  versionName      String?
+  versionName      String
   yearRelease      Int?
   price            Decimal? @db.Decimal(10, 2)
   monthlyPrice     Decimal? @db.Decimal(10, 2)
