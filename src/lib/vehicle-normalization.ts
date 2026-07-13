@@ -121,12 +121,14 @@ export function normalizeString(raw: unknown): string | null {
 export interface NormalizedVehicleInput {
   maker: string | null;
   model: string | null;
+  versionName: string | null;
   yearRelease: number | null;
   price: number | null;
   monthlyPrice: number | null;
   km: number | null;
   cc: number | null;
   hp: number | null;
+  discountType: string | null;
   fuel: string | null;
   transmissionType: string | null;
   color: string | null;
@@ -139,41 +141,45 @@ export interface NormalizedVehicleInput {
 }
 
 export function normalizeVehiclePayload(raw: {
-  Maker?: unknown;
-  Model?: unknown;
-  YearRelease?: unknown;
-  Price?: unknown;
-  MonthlyPrice?: unknown;
-  Km?: unknown;
-  Cc?: unknown;
-  Hp?: unknown;
-  Fuel?: unknown;
-  TransmissionType?: unknown;
-  Color?: unknown;
-  Offer?: unknown;
-  Froze?: unknown;
-  Delete?: unknown;
-  TypeOfCar?: unknown;
-  Plate?: unknown;
-  VIN?: unknown;
+  maker?: unknown;
+  model?: unknown;
+  versionName?: unknown;
+  yearRelease?: unknown;
+  price?: unknown;
+  monthlyPrice?: unknown;
+  km?: unknown;
+  cc?: unknown;
+  hp?: unknown;
+  discountType?: unknown;
+  fuel?: unknown;
+  transmissionType?: unknown;
+  color?: unknown;
+  offer?: unknown;
+  froze?: unknown;
+  isDeleted?: unknown;
+  typeOfCar?: unknown;
+  plate?: unknown;
+  vin?: unknown;
 }): NormalizedVehicleInput {
   return {
-    maker: normalizeMaker(normalizeString(raw.Maker)),
-    model: normalizeModel(normalizeString(raw.Model)),
-    yearRelease: normalizeInt(raw.YearRelease),
-    price: normalizeNumber(raw.Price),
-    monthlyPrice: normalizeNumber(raw.MonthlyPrice),
-    km: normalizeInt(raw.Km),
-    cc: normalizeInt(raw.Cc),
-    hp: normalizeInt(raw.Hp),
-    fuel: normalizeFuel(normalizeString(raw.Fuel)),
-    transmissionType: normalizeTransmission(normalizeString(raw.TransmissionType)),
-    color: normalizeColor(normalizeString(raw.Color)),
-    typeOfCar: normalizeTypeOfCar(normalizeString(raw.TypeOfCar)),
-    offer: normalizeBoolean(raw.Offer),
-    froze: normalizeBoolean(raw.Froze),
-    isDeleted: normalizeBoolean(raw.Delete),
-    plate: normalizeString(raw.Plate),
-    vin: normalizeString(raw.VIN),
+    maker: normalizeMaker(normalizeString(raw.maker)),
+    model: normalizeModel(normalizeString(raw.model)),
+    versionName: normalizeString(raw.versionName),
+    yearRelease: normalizeInt(raw.yearRelease),
+    price: normalizeNumber(raw.price),
+    monthlyPrice: normalizeNumber(raw.monthlyPrice),
+    km: normalizeInt(raw.km),
+    cc: normalizeInt(raw.cc),
+    hp: normalizeInt(raw.hp),
+    discountType: normalizeString(raw.discountType),
+    fuel: normalizeFuel(normalizeString(raw.fuel)),
+    transmissionType: normalizeTransmission(normalizeString(raw.transmissionType)),
+    color: normalizeColor(normalizeString(raw.color)),
+    typeOfCar: normalizeTypeOfCar(normalizeString(raw.typeOfCar)),
+    offer: normalizeBoolean(raw.offer),
+    froze: normalizeBoolean(raw.froze),
+    isDeleted: normalizeBoolean(raw.isDeleted),
+    plate: normalizeString(raw.plate),
+    vin: normalizeString(raw.vin),
   };
 }

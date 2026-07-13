@@ -420,7 +420,7 @@ export async function reorderVehicleImages(vehicleId: string, orderedImageIds: s
  * spec, flags), never photos or copy.
  */
 export async function upsertVehicleFromStock(raw: CarStockPayloadItem) {
-  const externalCarId = String(raw.CarId);
+  const externalCarId = String(raw.carId);
   const normalized = normalizeVehiclePayload(raw);
 
   const existing = await prisma.vehicle.findUnique({ where: { externalCarId } });
@@ -478,11 +478,14 @@ export async function upsertVehicleFromStock(raw: CarStockPayloadItem) {
 /**
  * Builds the update payload for an EXISTING vehicle, field-by-field, only
  * touching keys the feed actually sent this time. Real stock feeds commonly
- * push minimal deltas (e.g. `{CarId, Froze}` to just freeze a listing) — if
+ * push minimal deltas (e.g. `{carId, froze}` to just freeze a listing) — if
  * every normalized field were written unconditionally, that single flag
  * flip would null out km/cc/hp/fuel/etc. on every such call. Contrast with
  * stockDataFromNormalized() below, used only for brand-new vehicles, where
  * defaulting absent fields to null is correct.
+ *
+ * `raw.imageUrl` is deliberately never read here — see the field comment on
+ * the canonical schema in carstock.schema.ts.
  */
 function stockUpdateDataFromRaw(
   raw: CarStockPayloadItem,
@@ -490,23 +493,25 @@ function stockUpdateDataFromRaw(
 ): Prisma.VehicleUncheckedUpdateInput {
   const data: Prisma.VehicleUncheckedUpdateInput = {};
 
-  if (raw.Maker !== undefined) data.maker = normalized.maker ?? undefined;
-  if (raw.Model !== undefined) data.model = normalized.model ?? undefined;
-  if (raw.YearRelease !== undefined) data.yearRelease = normalized.yearRelease;
-  if (raw.Price !== undefined) data.price = normalized.price;
-  if (raw.MonthlyPrice !== undefined) data.monthlyPrice = normalized.monthlyPrice;
-  if (raw.Km !== undefined) data.km = normalized.km;
-  if (raw.Cc !== undefined) data.cc = normalized.cc;
-  if (raw.Hp !== undefined) data.hp = normalized.hp;
-  if (raw.Fuel !== undefined) data.fuel = normalized.fuel;
-  if (raw.TransmissionType !== undefined) data.transmissionType = normalized.transmissionType;
-  if (raw.Color !== undefined) data.color = normalized.color;
-  if (raw.TypeOfCar !== undefined) data.typeOfCar = normalized.typeOfCar;
-  if (raw.Offer !== undefined) data.offer = normalized.offer;
-  if (raw.Froze !== undefined) data.froze = normalized.froze;
-  if (raw.Delete !== undefined) data.isDeleted = normalized.isDeleted;
-  if (raw.Plate !== undefined) data.plate = normalized.plate;
-  if (raw.VIN !== undefined) data.vin = normalized.vin;
+  if (raw.maker !== undefined) data.maker = normalized.maker ?? undefined;
+  if (raw.model !== undefined) data.model = normalized.model ?? undefined;
+  if (raw.versionName !== undefined) data.versionName = normalized.versionName;
+  if (raw.yearRelease !== undefined) data.yearRelease = normalized.yearRelease;
+  if (raw.price !== undefined) data.price = normalized.price;
+  if (raw.monthlyPrice !== undefined) data.monthlyPrice = normalized.monthlyPrice;
+  if (raw.km !== undefined) data.km = normalized.km;
+  if (raw.cc !== undefined) data.cc = normalized.cc;
+  if (raw.hp !== undefined) data.hp = normalized.hp;
+  if (raw.discountType !== undefined) data.discountType = normalized.discountType;
+  if (raw.fuel !== undefined) data.fuel = normalized.fuel;
+  if (raw.transmissionType !== undefined) data.transmissionType = normalized.transmissionType;
+  if (raw.color !== undefined) data.color = normalized.color;
+  if (raw.typeOfCar !== undefined) data.typeOfCar = normalized.typeOfCar;
+  if (raw.offer !== undefined) data.offer = normalized.offer;
+  if (raw.froze !== undefined) data.froze = normalized.froze;
+  if (raw.isDeleted !== undefined) data.isDeleted = normalized.isDeleted;
+  if (raw.plate !== undefined) data.plate = normalized.plate;
+  if (raw.vin !== undefined) data.vin = normalized.vin;
 
   return data;
 }
@@ -515,12 +520,14 @@ function stockDataFromNormalized(normalized: NormalizedVehicleInput) {
   return {
     maker: normalized.maker ?? undefined,
     model: normalized.model ?? undefined,
+    versionName: normalized.versionName,
     yearRelease: normalized.yearRelease,
     price: normalized.price,
     monthlyPrice: normalized.monthlyPrice,
     km: normalized.km,
     cc: normalized.cc,
     hp: normalized.hp,
+    discountType: normalized.discountType,
     fuel: normalized.fuel,
     transmissionType: normalized.transmissionType,
     color: normalized.color,

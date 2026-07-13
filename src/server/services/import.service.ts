@@ -18,7 +18,7 @@ export async function processCarStockPayload(items: CarStockPayloadItem[], sourc
       if (result.action === "deleted") deletedCount += 1;
       if (result.action === "frozen") frozenCount += 1;
     } catch (error) {
-      errors.push({ carId: item.CarId, error: error instanceof Error ? error.message : "Unknown error" });
+      errors.push({ carId: item.carId, error: error instanceof Error ? error.message : "Unknown error" });
     }
   }
 
