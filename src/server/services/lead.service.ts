@@ -1,21 +1,70 @@
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { CreateLeadInput, UpdateLeadInput } from "@/lib/validators/lead.schema";
+import type { LeadWithVehicle } from "@/server/services/lead-notification.service";
 
-export async function createLead(input: CreateLeadInput, opts: { userId?: string; source?: string }) {
-  return prisma.lead.create({
-    data: {
-      userId: opts.userId,
-      vehicleId: input.vehicleId || null,
-      interestType: input.interestType,
-      firstName: input.firstName,
-      lastName: input.lastName,
-      email: input.email,
-      phone: input.phone || null,
-      message: input.message || null,
-      source: opts.source ?? "website",
-    },
-  });
+export interface CreateLeadResult {
+  lead: LeadWithVehicle;
+  /** True when `input.submissionId` already matched an existing Lead — the
+   * row returned is the ORIGINAL one, nothing was written, and the caller
+   * must skip notification emails entirely (see /api/leads/route.ts). */
+  isDuplicate: boolean;
+}
+
+/**
+ * Creates a Lead, or — when `input.submissionId` is set and already used —
+ * returns the original Lead untouched. This is what makes retrying the
+ * exact same form submission (e.g. after a client-side network error) safe:
+ * no duplicate row, and the caller knows (via `isDuplicate`) not to fire
+ * notification emails a second time.
+ */
+export async function createLead(
+  input: CreateLeadInput,
+  opts: { userId?: string; source?: string },
+): Promise<CreateLeadResult> {
+  if (input.submissionId) {
+    const existing = await prisma.lead.findUnique({
+      where: { submissionId: input.submissionId },
+      include: { vehicle: true },
+    });
+    if (existing) return { lead: existing, isDuplicate: true };
+  }
+
+  const data = {
+    userId: opts.userId,
+    vehicleId: input.vehicleId || null,
+    interestType: input.interestType,
+    firstName: input.firstName,
+    lastName: input.lastName,
+    email: input.email,
+    phone: input.phone || null,
+    message: input.message || null,
+    source: opts.source ?? "website",
+    submissionId: input.submissionId || null,
+  };
+
+  try {
+    const lead = await prisma.lead.create({ data, include: { vehicle: true } });
+    return { lead, isDuplicate: false };
+  } catch (error) {
+    // Two concurrent requests carrying the same submissionId can both pass
+    // the findUnique check above before either commits — the loser hits a
+    // unique-constraint violation here instead of a lost update. Treat that
+    // exactly like the pre-check hit: return the winner's row as a
+    // duplicate rather than surfacing a spurious 500 to the client.
+    if (
+      input.submissionId &&
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      const existing = await prisma.lead.findUnique({
+        where: { submissionId: input.submissionId },
+        include: { vehicle: true },
+      });
+      if (existing) return { lead: existing, isDuplicate: true };
+    }
+    throw error;
+  }
 }
 
 export async function listLeads(params: {

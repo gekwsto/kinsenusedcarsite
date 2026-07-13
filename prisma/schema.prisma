@@ -164,6 +164,13 @@ model Lead {
   source        String?
   internalNotes Json?
 
+  // Client-generated key (one per modal open) so a retried submission of the
+  // exact same form (e.g. after a transient network error) is a no-op:
+  // same Lead returned, no duplicate row, no duplicate emails. Nullable +
+  // unique: Postgres treats multiple NULLs as distinct, so submissions
+  // without a key (or from older clients) never collide with each other.
+  submissionId String? @unique
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

@@ -14,6 +14,10 @@ export const createLeadSchema = z.object({
     errorMap: () => ({ message: "Πρέπει να αποδεχτείτε την πολιτική απορρήτου" }),
   }),
   honeypot: z.string().max(0).optional(),
+  // Client-generated per-modal-open key (see interest-modal.tsx). Retrying
+  // the exact same submission with the same key must be a no-op — see
+  // createLead() in lead.service.ts.
+  submissionId: z.string().uuid().optional(),
 });
 
 export type CreateLeadInput = z.infer<typeof createLeadSchema>;

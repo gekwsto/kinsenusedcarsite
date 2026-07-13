@@ -172,6 +172,12 @@ function InterestModalPanel({
 }) {
   const [status, setStatus] = React.useState<"idle" | "submitting" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  // One key per modal open (this whole component remounts per open/close —
+  // see the comment above InterestModalPanel). Resubmitting after a
+  // transient error reuses the same key, so the server treats it as a
+  // retry of the same submission, not a new one; closing and reopening the
+  // modal generates a fresh key, so a genuinely new submission still works.
+  const [submissionId] = React.useState(() => crypto.randomUUID());
 
   const {
     register,
@@ -191,6 +197,7 @@ function InterestModalPanel({
       vehicleId,
       consent: undefined,
       honeypot: "",
+      submissionId,
     },
   });
 

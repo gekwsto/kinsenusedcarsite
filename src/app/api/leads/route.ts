@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { getClientIp, isRateLimited } from "@/lib/rate-limit";
 import { createLeadSchema } from "@/lib/validators/lead.schema";
 import { createLead } from "@/server/services/lead.service";
+import { notifyLeadCreated } from "@/server/services/lead-notification.service";
 
 const RATE_LIMIT = 5;
 const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
@@ -34,7 +35,22 @@ export async function POST(request: NextRequest) {
     }
 
     const session = await auth();
-    await createLead(parsed.data, { userId: session?.user?.id, source: "website" });
+    const { lead, isDuplicate } = await createLead(parsed.data, { userId: session?.user?.id, source: "website" });
+
+    // A retried submission of the exact same form (same submissionId) must
+    // return the same success response WITHOUT re-sending either email —
+    // the Lead already exists and was already notified the first time.
+    if (!isDuplicate) {
+      // Defense in depth: notifyLeadCreated() already never throws (every
+      // send is independently try/caught internally), but wrapping the call
+      // itself too means even a bug in there can't turn an already-saved
+      // Lead into a failed HTTP response.
+      try {
+        await notifyLeadCreated(lead);
+      } catch (error) {
+        console.error(`Lead ${lead.id} was saved but notification dispatch threw unexpectedly`, error);
+      }
+    }
 
     return NextResponse.json({ ok: true }, { status: 201 });
   } catch (error) {
