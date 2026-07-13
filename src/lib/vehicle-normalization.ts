@@ -112,28 +112,37 @@ export function normalizeInt(raw: unknown): number | null {
   return num === null ? null : Math.round(num);
 }
 
-// CarStock's `yearRelease` is usually a plain year ("2022" or 2022), but
-// sometimes arrives as a full date-time string instead (observed live:
-// "2/22/2022 12:00:00 AM"). Routing that through normalizeInt's
-// parseFloat silently mis-parses it — parseFloat stops at the first
-// non-numeric character, so "2/22/2022 ..." becomes 2, not 2022. A plain
-// digits-only string/number is parsed directly (no Date involved, so no
-// locale/format ambiguity); anything else is parsed as a date and only
-// its year is kept.
-export function normalizeYear(raw: unknown): number | null {
+/**
+ * yearRelease arrives in wildly different shapes depending on the feed: a
+ * bare year ("2022" / 2022), an ISO date, or — from the real CarStock
+ * system — a full US-style date-time string like
+ * "2/22/2022 12:00:00 AM". Only the year is ever meaningful to us, so this
+ * extracts it via explicit pattern matching rather than routing everything
+ * through `new Date(...)`, whose date-only-vs-date-time parsing rules
+ * differ (UTC vs local time) and can shift the year at day/timezone
+ * boundaries.
+ */
+export function normalizeYearRelease(raw: unknown): number | null {
   if (raw === null || raw === undefined || raw === "") return null;
   if (typeof raw === "number") return Number.isFinite(raw) ? Math.round(raw) : null;
 
   const str = String(raw).trim();
-  if (str.length === 0) return null;
+  if (!str) return null;
 
-  if (/^-?\d+(\.\d+)?$/.test(str)) {
-    const num = parseFloat(str);
-    return Number.isFinite(num) ? Math.round(num) : null;
-  }
+  // Bare year: "2022"
+  if (/^\d{4}$/.test(str)) return parseInt(str, 10);
 
-  const parsedDate = new Date(str);
-  return Number.isNaN(parsedDate.getTime()) ? null : parsedDate.getFullYear();
+  // ISO date(-time): "2022-02-22", "2022-02-22T00:00:00.000Z"
+  const isoMatch = str.match(/^(\d{4})-\d{2}-\d{2}/);
+  if (isoMatch) return parseInt(isoMatch[1]!, 10);
+
+  // US-style date(-time): "2/22/2022", "2/22/2022 12:00:00 AM"
+  const usMatch = str.match(/^\d{1,2}\/\d{1,2}\/(\d{4})/);
+  if (usMatch) return parseInt(usMatch[1]!, 10);
+
+  // Fallback for any other date-like format the feed might send.
+  const parsed = new Date(str);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.getFullYear();
 }
 
 export function normalizeString(raw: unknown): string | null {
@@ -189,7 +198,7 @@ export function normalizeVehiclePayload(raw: {
     maker: normalizeMaker(normalizeString(raw.maker)),
     model: normalizeModel(normalizeString(raw.model)),
     versionName: normalizeString(raw.versionName),
-    yearRelease: normalizeYear(raw.yearRelease),
+    yearRelease: normalizeYearRelease(raw.yearRelease),
     price: normalizeNumber(raw.price),
     monthlyPrice: normalizeNumber(raw.monthlyPrice),
     km: normalizeInt(raw.km),

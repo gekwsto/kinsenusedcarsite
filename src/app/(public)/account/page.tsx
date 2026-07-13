@@ -21,6 +21,7 @@ const INTEREST_LABELS: Record<string, string> = {
   FINANCING: "Δανειοδότηση",
   TEST_DRIVE: "Test Drive",
   GENERAL: "Γενική ερώτηση",
+  PURCHASE: "Αγορά",
 };
 
 const STATUS_LABELS: Record<string, string> = {

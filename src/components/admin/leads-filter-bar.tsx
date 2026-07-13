@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const STATUS_OPTIONS = ["all", "NEW", "CONTACTED", "IN_PROGRESS", "WON", "LOST", "SPAM"];
-const INTEREST_OPTIONS = ["all", "LEASING", "FINANCING", "TEST_DRIVE", "GENERAL"];
+const INTEREST_OPTIONS = ["all", "LEASING", "FINANCING", "TEST_DRIVE", "GENERAL", "PURCHASE"];
 
 export function LeadsFilterBar() {
   const router = useRouter();

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const interestTypeEnum = z.enum(["LEASING", "FINANCING", "TEST_DRIVE", "GENERAL"]);
+export const interestTypeEnum = z.enum(["LEASING", "FINANCING", "TEST_DRIVE", "GENERAL", "PURCHASE"]);
 
 export const createLeadSchema = z.object({
   firstName: z.string().min(1, "Το όνομα είναι υποχρεωτικό"),

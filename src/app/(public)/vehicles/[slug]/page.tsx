@@ -1,29 +1,15 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import {
-  CalendarDays,
-  Gauge,
-  ShieldCheck,
-  CheckCircle2,
-  ArrowRight,
-  Car,
-  CarFront,
-  Shapes,
-  Fuel,
-  Cog,
-  Zap,
-  Box,
-  Palette,
-} from "lucide-react";
+import { Car, CarFront, Shapes, Fuel, Cog, Gauge, Zap, Box, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { VehicleGallery } from "@/components/vehicles/vehicle-gallery";
-import { FavoriteButton } from "@/components/vehicles/favorite-button";
 import { InterestModalProvider, InterestModalTrigger } from "@/components/vehicles/interest-modal";
+import { VehiclePricingSection } from "@/components/vehicles/vehicle-pricing-section";
 import { VehicleGrid } from "@/components/vehicles/vehicle-grid";
 import { getPublicVehicleBySlug, getSimilarVehicles } from "@/server/services/vehicle.service";
 import { resolveVehicleImages, resolveVehicleImagesForList } from "@/server/services/vehicle-image.service";
-import { formatEuro, formatKm } from "@/lib/utils";
+import { formatKm } from "@/lib/utils";
 
 interface PageParams {
   slug: string;
@@ -66,7 +52,6 @@ export default async function VehicleDetailPage({ params }: { params: Promise<Pa
   ]);
   const similarVehicles = await resolveVehicleImagesForList(similarVehiclesRaw);
   const vehicleLabel = `${vehicle.maker} ${vehicle.versionName}${vehicle.yearRelease ? ` ${vehicle.yearRelease}` : ""}`;
-  const isForSale = vehicle.price !== null;
 
   const specs: { icon: typeof Car; label: string; value: string }[] = [
     { icon: Car, label: "Μάρκα", value: vehicle.maker || "-" },
@@ -110,89 +95,14 @@ export default async function VehicleDetailPage({ params }: { params: Promise<Pa
 
       <div className="mx-auto mt-8 max-w-[1200px] rounded-3xl bg-[#f5f9fc] p-4 shadow-[0_0_12px_rgba(0,0,0,0.05)] sm:p-8">
         <div className="rounded-2xl border border-primary/10 bg-white p-5 shadow-[0_18px_55px_rgba(2,56,89,0.08)] sm:p-7">
-          <div className="grid grid-cols-1 gap-6 border-b border-[#e8eef2] pb-6 lg:grid-cols-[1fr_1.25fr] lg:gap-10">
-            {/* Left: tabs, title, meta */}
-            <div>
-              <div className="mb-4 grid w-full max-w-[320px] grid-cols-2 gap-1 rounded-full border border-[#dfe8ed] bg-[#f7fafc] p-1">
-                <span className="rounded-full bg-detail py-2 text-center text-sm font-extrabold text-white shadow-[0_8px_18px_rgba(0,137,154,0.22)]">
-                  Leasing
-                </span>
-                {isForSale && (
-                  <span className="rounded-full py-2 text-center text-sm font-extrabold text-[#8a97a5]">Αγορά</span>
-                )}
-              </div>
-
-              <div className="mb-3 flex items-start justify-between gap-3">
-                <h1 className="text-2xl font-extrabold leading-tight text-detail-title sm:text-3xl">
-                  {vehicle.maker} {vehicle.versionName}
-                </h1>
-                <FavoriteButton vehicleId={vehicle.id} />
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3 text-sm font-bold text-[#7b8794]">
-                <span className="inline-flex items-center gap-1.5">
-                  <CalendarDays className="h-4 w-4 text-detail" /> {vehicle.yearRelease ?? "-"}
-                </span>
-                <span>·</span>
-                <span className="inline-flex items-center gap-1.5">
-                  <Gauge className="h-4 w-4 text-detail" /> {vehicle.km !== null ? formatKm(vehicle.km) : "-"}
-                </span>
-                <span>·</span>
-                <span className="inline-flex items-center gap-1.5">
-                  <ShieldCheck className="h-4 w-4 text-detail" /> Ελεγμένο
-                </span>
-              </div>
-            </div>
-
-            {/* Right: price cards, benefits, CTAs */}
-            <div>
-              <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-                {vehicle.monthlyPrice !== null && (
-                  <div className="min-h-[116px] rounded-xl border border-[#dfe8ed] bg-white p-5">
-                    <span className="mb-2 block font-extrabold text-detail">Leasing από</span>
-                    <div className="text-2xl font-black leading-none text-detail-title">
-                      {formatEuro(vehicle.monthlyPrice)}
-                      <small className="text-sm font-extrabold text-[#52616f]"> /μήνα*</small>
-                    </div>
-                    <span className="mt-2 block font-bold text-[#52616f]">για 24 μήνες/20.000χλμ</span>
-                  </div>
-                )}
-                {isForSale && (
-                  <div className="min-h-[116px] rounded-xl border border-[#dfe8ed] bg-white p-5">
-                    <span className="mb-2 block font-extrabold text-detail">Τιμή αγοράς</span>
-                    <div className="text-2xl font-black leading-none text-detail-title">{formatEuro(vehicle.price)}</div>
-                    <span className="mt-2 block font-bold text-[#52616f]">με ΦΠΑ</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="my-4 flex flex-wrap gap-8 text-sm font-bold text-[#7b8794]">
-                <span className="inline-flex items-center gap-1.5">
-                  <CheckCircle2 className="h-4 w-4 text-detail" /> Χωρίς προκαταβολή
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <CheckCircle2 className="h-4 w-4 text-detail" /> Σταθερό μηνιαίο κόστος
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <InterestModalTrigger
-                  interestType="LEASING"
-                  className="flex w-full items-center justify-center gap-3 rounded-lg border border-detail bg-detail px-4 py-3.5 text-sm font-extrabold text-white transition-colors hover:bg-[#004c74]"
-                >
-                  Ενδιαφέρομαι για Leasing <ArrowRight className="h-4 w-4" />
-                </InterestModalTrigger>
-                {isForSale && (
-                  <InterestModalTrigger
-                    interestType="GENERAL"
-                    className="flex w-full items-center justify-center gap-3 rounded-lg border border-detail bg-detail px-4 py-3.5 text-sm font-extrabold text-white transition-colors hover:bg-[#004c74]"
-                  >
-                    Ενδιαφέρομαι για Πώληση <ArrowRight className="h-4 w-4" />
-                  </InterestModalTrigger>
-                )}
-              </div>
-            </div>
-          </div>
+          <VehiclePricingSection
+            vehicleId={vehicle.id}
+            vehicleLabel={vehicleLabel}
+            yearRelease={vehicle.yearRelease}
+            km={vehicle.km}
+            monthlyPrice={vehicle.monthlyPrice}
+            price={vehicle.price}
+          />
 
           {/* Specs grid */}
           <div className="grid grid-cols-1 gap-x-4 pt-5 sm:grid-cols-2 lg:grid-cols-3">

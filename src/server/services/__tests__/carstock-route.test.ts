@@ -95,7 +95,7 @@ test("create one new vehicle: returns {ok:true, added:1}", async (t) => {
   });
   await cleanupVehicle(carId);
 
-  const response = await POST(buildRequest([{ carId, maker: "Toyota", model: "Corolla" }]));
+  const response = await POST(buildRequest([{ carId, maker: "Toyota", model: "Corolla Route Fixture" }]));
   assert.equal(response.status, 200);
   assert.deepEqual(await readJson(response), { ok: true, added: 1 });
 });
@@ -111,7 +111,7 @@ test("update an existing vehicle: returns {ok:true, added:0}", async (t) => {
   });
   await cleanupVehicle(carId);
 
-  await POST(buildRequest([{ carId, maker: "Toyota", model: "Corolla", km: 10000 }]));
+  await POST(buildRequest([{ carId, maker: "Toyota", model: "Corolla Route Fixture", km: 10000 }]));
 
   const response = await POST(buildRequest([{ carId, km: 20000 }]));
   assert.equal(response.status, 200);
@@ -129,7 +129,7 @@ test("freeze an existing vehicle: returns {ok:true, added:0}", async (t) => {
   });
   await cleanupVehicle(carId);
 
-  await POST(buildRequest([{ carId, maker: "Toyota", model: "Corolla" }]));
+  await POST(buildRequest([{ carId, maker: "Toyota", model: "Corolla Route Fixture" }]));
 
   const response = await POST(buildRequest([{ carId, froze: true }]));
   assert.equal(response.status, 200);
@@ -147,7 +147,7 @@ test("delete an existing vehicle: returns {ok:true, added:0}", async (t) => {
   });
   await cleanupVehicle(carId);
 
-  await POST(buildRequest([{ carId, maker: "Toyota", model: "Corolla" }]));
+  await POST(buildRequest([{ carId, maker: "Toyota", model: "Corolla Route Fixture" }]));
 
   const response = await POST(buildRequest([{ carId, delete: true }]));
   assert.equal(response.status, 200);
@@ -169,7 +169,7 @@ test("mixed create/update payload: added counts only the newly created vehicle",
   await cleanupVehicle(existingCarId);
   await cleanupVehicle(newCarId);
 
-  await POST(buildRequest([{ carId: existingCarId, maker: "Toyota", model: "Corolla" }]));
+  await POST(buildRequest([{ carId: existingCarId, maker: "Toyota", model: "Corolla Route Fixture" }]));
 
   const response = await POST(
     buildRequest([

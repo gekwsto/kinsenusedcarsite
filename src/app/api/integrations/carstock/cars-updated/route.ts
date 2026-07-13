@@ -28,6 +28,20 @@ function isAuthorized(request: NextRequest): boolean {
 }
 
 export async function POST(request: NextRequest) {
+  // TEMPORARY diagnostic for the production 403 investigation (used.kinsen.gr
+  // returns 403 for the real CarStock caller before this line would ever
+  // execute, if the block happens at Cloudflare/Nginx Proxy Manager). Its
+  // presence or absence in prod logs is the definitive test for "did this
+  // request even reach the Next.js container." Never logs the token value —
+  // only presence/shape of the Authorization header. Remove once the 403 is
+  // root-caused.
+  console.info("[carstock-diagnostic]", {
+    pathname: request.nextUrl.pathname,
+    hasAuthorizationHeader: request.headers.has("authorization"),
+    startsWithBearer: (request.headers.get("authorization") ?? "").startsWith("Bearer "),
+    reachedRouteHandler: true,
+  });
+
   try {
     if (!process.env.CARSTOCK_API_KEY) {
       // Never silently allow requests when the shared secret isn't configured.

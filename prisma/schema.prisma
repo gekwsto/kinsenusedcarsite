@@ -18,6 +18,7 @@ enum InterestType {
   FINANCING
   TEST_DRIVE
   GENERAL
+  PURCHASE
 }
 
 enum LeadStatus {

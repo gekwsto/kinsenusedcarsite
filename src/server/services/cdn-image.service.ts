@@ -4,6 +4,20 @@
  * and serves the actual image bytes from a separate, token-free public path.
  * Only this module knows the CDN's URL shape and response format — everything
  * else in the app works with plain `{ name, url }` results.
+ *
+ * Two different base URLs reach the same CDN, for two different callers:
+ *
+ *   - CDN_INTERNAL_BASE_URL (e.g. `http://cdn`) — used ONLY for the
+ *     server-side listing fetch below. This app and the CDN container share
+ *     a private Docker network, so this never touches the public internet.
+ *     It exists because the public hostname's listing path started getting
+ *     blocked by Cloudflare Bot Fight Mode (403 Managed Challenge) for
+ *     server-to-server traffic; the Docker-internal route sidesteps that
+ *     entirely without needing any Cloudflare/proxy change.
+ *   - CDN_PUBLIC_BASE_URL (e.g. `https://cdn.kinsen.gr`) — used to build the
+ *     image `url` values returned to callers, which end up in rendered HTML,
+ *     API responses, and the browser. The internal hostname must never leak
+ *     into any of those.
  */
 
 export interface CdnImageFile {
@@ -12,7 +26,8 @@ export interface CdnImageFile {
 }
 
 interface CdnConfig {
-  baseUrl: string;
+  internalBaseUrl: string;
+  publicBaseUrl: string;
   listPath: string;
   publicPath: string;
   listToken: string;
@@ -54,21 +69,44 @@ function normalizePathSegment(segment: string): string {
   return withLeadingSlash.replace(/\/+$/, "") || "/";
 }
 
+// `new URL(...)` throwing is the cheapest correctness check available for
+// "is this actually a usable absolute URL" — catches empty/garbled config
+// (e.g. a typo'd protocol) before it ever reaches `fetch`.
+function isValidBaseUrl(value: string): boolean {
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function getCdnConfig(): CdnConfig | null {
-  const baseUrl = process.env.CDN_BASE_URL?.trim();
+  const internalBaseUrl = process.env.CDN_INTERNAL_BASE_URL?.trim();
+  const publicBaseUrl = process.env.CDN_PUBLIC_BASE_URL?.trim();
   const listToken = process.env.CDN_LIST_TOKEN?.trim();
 
-  if (!baseUrl || !listToken) {
+  const isMisconfigured =
+    !internalBaseUrl ||
+    !publicBaseUrl ||
+    !listToken ||
+    !isValidBaseUrl(internalBaseUrl) ||
+    !isValidBaseUrl(publicBaseUrl);
+
+  if (isMisconfigured) {
     if (!warnedMissingConfig) {
-      // Never log the token itself, only the fact that config is missing.
-      console.warn("[cdn-image] CDN_BASE_URL / CDN_LIST_TOKEN not configured — CDN vehicle images are disabled");
+      // Never log the token itself, only the fact that config is missing/invalid.
+      console.warn(
+        "[cdn-image] CDN_INTERNAL_BASE_URL / CDN_PUBLIC_BASE_URL / CDN_LIST_TOKEN missing or invalid — CDN vehicle images are disabled",
+      );
       warnedMissingConfig = true;
     }
     return null;
   }
 
   return {
-    baseUrl: baseUrl.replace(/\/+$/, ""),
+    internalBaseUrl: internalBaseUrl.replace(/\/+$/, ""),
+    publicBaseUrl: publicBaseUrl.replace(/\/+$/, ""),
     listPath: normalizePathSegment(process.env.CDN_VEHICLE_LIST_PATH || "/_list"),
     publicPath: normalizePathSegment(process.env.CDN_VEHICLE_PUBLIC_PATH || "/usedcars"),
     listToken,
@@ -77,17 +115,21 @@ function getCdnConfig(): CdnConfig | null {
   };
 }
 
+// Server-side only — resolves on the Docker-internal network, never sent
+// anywhere near the browser.
 function buildCdnListingUrl(config: CdnConfig, vin: string): string {
   const encodedVin = encodeURIComponent(vin);
   // Trailing slash matters: the CDN 301-redirects without it, which would
   // cost an extra round trip on every uncached request.
-  return `${config.baseUrl}${config.listPath}/${config.listToken}${config.publicPath}/${encodedVin}/`;
+  return `${config.internalBaseUrl}${config.listPath}/${config.listToken}${config.publicPath}/${encodedVin}/`;
 }
 
+// Public host only — this is the URL shape that ends up in rendered HTML,
+// API responses, and client-side JavaScript.
 function buildCdnPublicImageUrl(config: CdnConfig, vin: string, filename: string): string {
   const encodedVin = encodeURIComponent(vin);
   const encodedFile = encodeURIComponent(filename);
-  return `${config.baseUrl}${config.publicPath}/${encodedVin}/${encodedFile}`;
+  return `${config.publicBaseUrl}${config.publicPath}/${encodedVin}/${encodedFile}`;
 }
 
 /**

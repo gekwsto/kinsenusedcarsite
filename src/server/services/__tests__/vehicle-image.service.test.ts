@@ -2,12 +2,13 @@ import { test, type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { resolveVehicleImages, resolveVehicleImagesForList } from "@/server/services/vehicle-image.service";
 
-const ENV_KEYS = ["CDN_BASE_URL", "CDN_LIST_TOKEN"] as const;
+const ENV_KEYS = ["CDN_INTERNAL_BASE_URL", "CDN_PUBLIC_BASE_URL", "CDN_LIST_TOKEN"] as const;
 
 function withCdnEnv(t: TestContext) {
   const original: Partial<Record<string, string | undefined>> = {};
   for (const key of ENV_KEYS) original[key] = process.env[key];
-  process.env.CDN_BASE_URL = "https://cdn.kinsen.gr";
+  process.env.CDN_INTERNAL_BASE_URL = "http://cdn";
+  process.env.CDN_PUBLIC_BASE_URL = "https://cdn.kinsen.gr";
   process.env.CDN_LIST_TOKEN = "test-token";
   t.after(() => {
     for (const key of ENV_KEYS) {

@@ -34,7 +34,7 @@ test("upsertVehicleFromStock: creates a new vehicle from the exact real CarStock
     {
       carId: EXTERNAL_ID,
       maker: "Toyota",
-      model: "Corolla",
+      model: "Corolla Import Fixture",
       versionName: "1.8 Hybrid Active",
       yearRelease: "2022",
       price: 18500.5,
@@ -61,7 +61,7 @@ test("upsertVehicleFromStock: creates a new vehicle from the exact real CarStock
   const vehicle = await prisma.vehicle.findUnique({ where: { externalCarId: EXTERNAL_ID } });
   assert.ok(vehicle);
   assert.equal(vehicle!.maker, "Toyota");
-  assert.equal(vehicle!.model, "Corolla");
+  assert.equal(vehicle!.model, "Corolla Import Fixture");
   assert.equal(vehicle!.versionName, "1.8 Hybrid Active");
   assert.equal(vehicle!.yearRelease, 2022);
   assert.equal(Number(vehicle!.price), 18500.5);
@@ -78,12 +78,12 @@ test("upsertVehicleFromStock: a full re-push updates every mapped field", async 
   await cleanupVehicle(EXTERNAL_ID);
 
   const [createItem] = carStockPayloadSchema.parse([
-    { carId: EXTERNAL_ID, maker: "Toyota", model: "Corolla", km: 32000, rent: 289.9, vin: "JTDBU4EE0N3123456" },
+    { carId: EXTERNAL_ID, maker: "Toyota", model: "Corolla Import Fixture", km: 32000, rent: 289.9, vin: "JTDBU4EE0N3123456" },
   ]);
   await upsertVehicleFromStock(createItem!);
 
   const [updateItem] = carStockPayloadSchema.parse([
-    { carId: EXTERNAL_ID, maker: "Toyota", model: "Corolla", km: 45000, rent: 310.0, price: 17500 },
+    { carId: EXTERNAL_ID, maker: "Toyota", model: "Corolla Import Fixture", km: 45000, rent: 310.0, price: 17500 },
   ]);
   const result = await upsertVehicleFromStock(updateItem!);
   assert.equal(result.action, "updated");
@@ -101,7 +101,7 @@ test("upsertVehicleFromStock: a partial {carId, froze} delta freezes without nul
   await cleanupVehicle(EXTERNAL_ID);
 
   const [createItem] = carStockPayloadSchema.parse([
-    { carId: EXTERNAL_ID, maker: "Toyota", model: "Corolla", km: 32000, cc: 1798, hp: 122, fuel: "Hybrid" },
+    { carId: EXTERNAL_ID, maker: "Toyota", model: "Corolla Import Fixture", km: 32000, cc: 1798, hp: 122, fuel: "Hybrid" },
   ]);
   await upsertVehicleFromStock(createItem!);
 
@@ -122,7 +122,7 @@ test("upsertVehicleFromStock: a partial {carId, delete} delta soft-deletes the v
   t.after(() => cleanupVehicle(EXTERNAL_ID));
   await cleanupVehicle(EXTERNAL_ID);
 
-  const [createItem] = carStockPayloadSchema.parse([{ carId: EXTERNAL_ID, maker: "Toyota", model: "Corolla" }]);
+  const [createItem] = carStockPayloadSchema.parse([{ carId: EXTERNAL_ID, maker: "Toyota", model: "Corolla Import Fixture" }]);
   await upsertVehicleFromStock(createItem!);
 
   const [deleteItem] = carStockPayloadSchema.parse([{ carId: EXTERNAL_ID, delete: true }]);
@@ -140,7 +140,7 @@ test("upsertVehicleFromStock: image_url never creates or overwrites VehicleImage
   await cleanupVehicle(EXTERNAL_ID);
 
   const [item] = carStockPayloadSchema.parse([
-    { carId: EXTERNAL_ID, maker: "Toyota", model: "Corolla", image_url: "https://carstock.example.com/x.jpg" },
+    { carId: EXTERNAL_ID, maker: "Toyota", model: "Corolla Import Fixture", image_url: "https://carstock.example.com/x.jpg" },
   ]);
   await upsertVehicleFromStock(item!);
 
@@ -175,7 +175,7 @@ test("processCarStockPayload: end-to-end create via the exact real payload, thro
     {
       carId: EXTERNAL_ID,
       maker: "Toyota",
-      model: "Corolla",
+      model: "Corolla Import Fixture",
       versionName: "1.8 Hybrid Active",
       yearRelease: "2022",
       price: 18500.5,

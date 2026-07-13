@@ -24,6 +24,7 @@ const INTEREST_LABELS: Record<InterestType, string> = {
   FINANCING: "Ενδιαφέρον για Δανειοδότηση",
   TEST_DRIVE: "Κράτηση Test Drive",
   GENERAL: "Ερώτηση για το όχημα",
+  PURCHASE: "Ενδιαφέρον για Αγορά",
 };
 
 // Matches the Kinsen premium easing used elsewhere (navigation loader, hero

@@ -4,11 +4,19 @@
  * Deliberately named `*.integration.smoke.ts`, not `*.test.ts`: the default
  * `npm test` script only globs `src/server/services/__tests__/**\/*.test.ts`,
  * so this file is excluded from that deterministic gate. Its skip-if-
- * unconfigured guard below only protects against a *missing* CDN_BASE_URL/
- * CDN_LIST_TOKEN — it does NOT protect against the configured CDN being
- * unreachable or the fixture VIN's real images changing, both of which
- * previously made `npm test` fail nondeterministically whenever `.env`
- * happened to have CDN credentials set in a given environment.
+ * unconfigured guard below only protects against *missing* CDN_INTERNAL_BASE_URL/
+ * CDN_PUBLIC_BASE_URL/CDN_LIST_TOKEN — it does NOT protect against the
+ * configured CDN being unreachable or the fixture VIN's real images
+ * changing, both of which previously made `npm test` fail
+ * nondeterministically whenever `.env` happened to have CDN credentials set
+ * in a given environment.
+ *
+ * The listing request goes out over CDN_INTERNAL_BASE_URL (e.g. `http://cdn`),
+ * same as production — so running this outside the Docker `proxy` network
+ * (a laptop, this repo's default dev environment, CI) will fail to resolve
+ * that host and the test will fail/skip rather than prove anything. It's
+ * only meaningful run from inside the container network, or against an
+ * internal URL reachable from wherever it's run.
  *
  * The exact same request/response *logic* this file exercises against the
  * real network (VIN validation, natural sort, extension filtering,
@@ -27,11 +35,13 @@ import assert from "node:assert/strict";
 import { getCdnVehicleImageFiles } from "@/server/services/cdn-image.service";
 
 const REAL_VIN = "WBA7K110707L27397";
-const hasCdnConfig = Boolean(process.env.CDN_BASE_URL && process.env.CDN_LIST_TOKEN);
+const hasCdnConfig = Boolean(
+  process.env.CDN_INTERNAL_BASE_URL && process.env.CDN_PUBLIC_BASE_URL && process.env.CDN_LIST_TOKEN,
+);
 
 test(
   "real CDN: known VIN returns its actual naturally-sorted image files",
-  { skip: !hasCdnConfig && "CDN_BASE_URL/CDN_LIST_TOKEN not configured in this environment" },
+  { skip: !hasCdnConfig && "CDN_INTERNAL_BASE_URL/CDN_PUBLIC_BASE_URL/CDN_LIST_TOKEN not configured in this environment" },
   async () => {
     const files = await getCdnVehicleImageFiles(REAL_VIN);
 
@@ -51,7 +61,7 @@ test(
 
 test(
   "real CDN: nonexistent VIN returns an empty list, not an error",
-  { skip: !hasCdnConfig && "CDN_BASE_URL/CDN_LIST_TOKEN not configured in this environment" },
+  { skip: !hasCdnConfig && "CDN_INTERNAL_BASE_URL/CDN_PUBLIC_BASE_URL/CDN_LIST_TOKEN not configured in this environment" },
   async () => {
     const files = await getCdnVehicleImageFiles("NOSUCHVIN0000001");
     assert.deepEqual(files, []);
