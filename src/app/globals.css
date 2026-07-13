@@ -58,15 +58,18 @@ body::-webkit-scrollbar-thumb:hover {
     @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
   }
 
-  /* `/vehicles` only — the results grid is the primary focus of that page
-     and benefits from substantially more width than the site's standard
-     1280px `.container-page`. Scoped to this one class (not a change to
+  /* Shared wide container — used by the sticky site header and the
+     `/vehicles` results layout only, so the header's logo/nav/account
+     cluster stays edge-aligned with the vehicles grid below it on large
+     screens. Substantially wider than the site's standard 1280px
+     `.container-page`, capped well short of full-bleed on ultrawide
+     monitors. Scoped to these two call sites (not a change to
      `.container-page` itself) so every other page's layout is untouched. */
-  .container-vehicles {
+  .container-wide {
     width: 100%;
-    max-width: 1600px;
+    max-width: 1880px;
     margin-inline: auto;
-    padding-inline: clamp(1.5rem, 2.2vw, 2.375rem);
+    padding-inline: clamp(1.5rem, 2.4vw, 3rem);
   }
 }
 

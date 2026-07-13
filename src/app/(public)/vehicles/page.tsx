@@ -50,10 +50,10 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
   const isLastPage = total > 0 && page >= totalPages;
 
   return (
-    <div className="container-vehicles py-8">
+    <div className="container-wide py-8">
       <div
         id={VEHICLE_RESULTS_START_ID}
-        className="grid scroll-mt-[var(--kinsen-header-offset)] grid-cols-1 gap-5 lg:grid-cols-[clamp(300px,23vw,340px)_minmax(0,1fr)] lg:items-start"
+        className="grid scroll-mt-[var(--kinsen-header-offset)] grid-cols-1 gap-5 lg:grid-cols-[clamp(300px,23vw,340px)_minmax(0,1fr)] lg:items-start xl:gap-6 xl:grid-cols-[clamp(320px,20vw,360px)_minmax(0,1fr)] 2xl:gap-7 2xl:grid-cols-[clamp(340px,18vw,380px)_minmax(0,1fr)]"
       >
         <VehicleFilterProvider>
           <VehicleFilters options={filterOptions} />

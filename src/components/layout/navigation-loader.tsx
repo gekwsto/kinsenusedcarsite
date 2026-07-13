@@ -35,13 +35,13 @@ export function NavigationLoader({ phase }: { phase: NavigationLoaderPhase }) {
           width={230}
           height={41}
           priority
-          // Matches the header logo's `sizes="128px"` exactly (both render
-          // this same asset at ~128px on desktop) so next/image resolves to
-          // the identical cached srcset URL instead of triggering a second,
-          // separate network fetch for a differently-sized rendition — the
-          // header has always already loaded by the time any client-side
+          // Matches the header logo's `sizes` exactly (src/components/layout/header.tsx)
+          // so next/image resolves to the identical cached srcset URL at
+          // every breakpoint instead of triggering a second, separate
+          // network fetch for a differently-sized rendition — the header
+          // has always already loaded by the time any client-side
           // navigation (and therefore this loader) can occur.
-          sizes="128px"
+          sizes="(min-width: 1280px) 144px, 128px"
           className="kinsen-navigation-loader__logo"
         />
 
