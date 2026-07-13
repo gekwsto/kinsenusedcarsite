@@ -75,6 +75,27 @@ test("normalizeVehiclePayload: turns the parsed real payload into typed Vehicle 
   assert.equal(normalized.isDeleted, false);
 });
 
+test("normalizeVehiclePayload: yearRelease as a full date-time string ('2/22/2022 12:00:00 AM') resolves to 2022, not 2 (observed live regression)", () => {
+  const parsed = carStockItemSchema.parse({ ...REAL_PAYLOAD, yearRelease: "2/22/2022 12:00:00 AM" });
+  const normalized = normalizeVehiclePayload(parsed);
+
+  assert.equal(normalized.yearRelease, 2022);
+});
+
+test("normalizeVehiclePayload: yearRelease as an ISO date string resolves to its year", () => {
+  const parsed = carStockItemSchema.parse({ ...REAL_PAYLOAD, yearRelease: "2019-11-05T00:00:00.000Z" });
+  const normalized = normalizeVehiclePayload(parsed);
+
+  assert.equal(normalized.yearRelease, 2019);
+});
+
+test("normalizeVehiclePayload: yearRelease as a numeric year (number, not string) is unaffected", () => {
+  const parsed = carStockItemSchema.parse({ ...REAL_PAYLOAD, yearRelease: 2021 });
+  const normalized = normalizeVehiclePayload(parsed);
+
+  assert.equal(normalized.yearRelease, 2021);
+});
+
 test("image_url never surfaces on the normalized Vehicle input", () => {
   const parsed = carStockItemSchema.parse(REAL_PAYLOAD);
   const normalized = normalizeVehiclePayload(parsed);

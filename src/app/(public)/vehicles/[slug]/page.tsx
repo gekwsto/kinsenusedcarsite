@@ -123,7 +123,9 @@ export default async function VehicleDetailPage({ params }: { params: Promise<Pa
               </div>
 
               <div className="mb-3 flex items-start justify-between gap-3">
-                <h1 className="text-2xl font-extrabold leading-tight text-detail-title sm:text-3xl">{vehicleLabel}</h1>
+                <h1 className="text-2xl font-extrabold leading-tight text-detail-title sm:text-3xl">
+                  {vehicle.maker} {vehicle.versionName}
+                </h1>
                 <FavoriteButton vehicleId={vehicle.id} />
               </div>
 

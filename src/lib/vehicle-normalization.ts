@@ -112,6 +112,30 @@ export function normalizeInt(raw: unknown): number | null {
   return num === null ? null : Math.round(num);
 }
 
+// CarStock's `yearRelease` is usually a plain year ("2022" or 2022), but
+// sometimes arrives as a full date-time string instead (observed live:
+// "2/22/2022 12:00:00 AM"). Routing that through normalizeInt's
+// parseFloat silently mis-parses it — parseFloat stops at the first
+// non-numeric character, so "2/22/2022 ..." becomes 2, not 2022. A plain
+// digits-only string/number is parsed directly (no Date involved, so no
+// locale/format ambiguity); anything else is parsed as a date and only
+// its year is kept.
+export function normalizeYear(raw: unknown): number | null {
+  if (raw === null || raw === undefined || raw === "") return null;
+  if (typeof raw === "number") return Number.isFinite(raw) ? Math.round(raw) : null;
+
+  const str = String(raw).trim();
+  if (str.length === 0) return null;
+
+  if (/^-?\d+(\.\d+)?$/.test(str)) {
+    const num = parseFloat(str);
+    return Number.isFinite(num) ? Math.round(num) : null;
+  }
+
+  const parsedDate = new Date(str);
+  return Number.isNaN(parsedDate.getTime()) ? null : parsedDate.getFullYear();
+}
+
 export function normalizeString(raw: unknown): string | null {
   if (raw === null || raw === undefined) return null;
   const str = String(raw).trim();
@@ -165,7 +189,7 @@ export function normalizeVehiclePayload(raw: {
     maker: normalizeMaker(normalizeString(raw.maker)),
     model: normalizeModel(normalizeString(raw.model)),
     versionName: normalizeString(raw.versionName),
-    yearRelease: normalizeInt(raw.yearRelease),
+    yearRelease: normalizeYear(raw.yearRelease),
     price: normalizeNumber(raw.price),
     monthlyPrice: normalizeNumber(raw.monthlyPrice),
     km: normalizeInt(raw.km),
