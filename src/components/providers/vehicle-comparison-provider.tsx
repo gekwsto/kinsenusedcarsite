@@ -4,11 +4,13 @@ import * as React from "react";
 import { toast } from "@/components/ui/use-toast";
 import {
   MAX_COMPARISON_VEHICLES,
+  MIN_COMPARISON_VEHICLES,
   VEHICLE_COMPARISON_STORAGE_KEY,
   addComparisonId,
   areComparisonIdListsEqual,
   buildComparisonUrl,
   createEmptyComparisonState,
+  isComparisonEligible,
   parseComparisonState,
   removeComparisonId,
   serializeComparisonState,
@@ -22,6 +24,7 @@ interface VehicleComparisonContextValue {
   selectedVehicles: readonly VehicleComparisonSummary[];
   selectedCount: number;
   maxVehicles: typeof MAX_COMPARISON_VEHICLES;
+  minVehicles: typeof MIN_COMPARISON_VEHICLES;
   isHydrated: boolean;
   isSidebarOpen: boolean;
   isSelected: (vehicleId: string) => boolean;
@@ -65,8 +68,8 @@ const VEHICLE_UNAVAILABLE_MESSAGE = "Ένα από τα επιλεγμένα α�
  * the validated query-string ID list is the source of truth for *what the
  * page renders*, and `syncSelectionFromUrl` additionally replaces the
  * provider's own selection with it — but only when the URL supplies an
- * exactly-MAX_COMPARISON_VEHICLES, de-duplicated ID list (syntactic
- * validity only; the page itself separately handles the case where the
+ * eligible (MIN_COMPARISON_VEHICLES..MAX_COMPARISON_VEHICLES), de-duplicated
+ * ID list (syntactic validity only; the page itself separately handles the case where the
  * database can't resolve one of those IDs to a real, public vehicle). An
  * incomplete or malformed URL never overwrites a valid, already-persisted
  * selection — a mistyped/truncated shared link should never wipe out a
@@ -235,7 +238,7 @@ export function VehicleComparisonProvider({ children }: { children: React.ReactN
 
   const syncSelectionFromUrl = React.useCallback(
     (urlIds: readonly string[]) => {
-      if (urlIds.length !== MAX_COMPARISON_VEHICLES) return;
+      if (!isComparisonEligible(urlIds.length)) return;
       if (new Set(urlIds).size !== urlIds.length) return;
       if (areComparisonIdListsEqual(urlIds, ids)) return;
       setIds(urlIds);
@@ -248,7 +251,7 @@ export function VehicleComparisonProvider({ children }: { children: React.ReactN
     [ids, summaryCache],
   );
 
-  const canCompare = ids.length === MAX_COMPARISON_VEHICLES;
+  const canCompare = isComparisonEligible(ids.length);
   const comparisonUrl = React.useMemo(() => buildComparisonUrl(ids), [ids]);
 
   const value = React.useMemo<VehicleComparisonContextValue>(
@@ -257,6 +260,7 @@ export function VehicleComparisonProvider({ children }: { children: React.ReactN
       selectedVehicles,
       selectedCount: ids.length,
       maxVehicles: MAX_COMPARISON_VEHICLES,
+      minVehicles: MIN_COMPARISON_VEHICLES,
       isHydrated,
       isSidebarOpen,
       isSelected,

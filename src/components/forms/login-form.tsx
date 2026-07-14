@@ -5,7 +5,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { signIn, getSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { NavigationLink as Link } from "@/components/navigation/navigation-link";
 import { useNavigationTransition } from "@/components/providers/navigation-transition-provider";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -121,13 +120,6 @@ export function LoginForm() {
         {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
         Σύνδεση
       </Button>
-
-      <p className="text-center text-sm text-ink-muted">
-        Δεν έχετε λογαριασμό;{" "}
-        <Link href="/register" className="text-primary hover:underline">
-          Εγγραφείτε
-        </Link>
-      </p>
     </form>
   );
 }

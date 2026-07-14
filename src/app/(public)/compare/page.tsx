@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { getPublicVehiclesByIds } from "@/server/services/vehicle.service";
 import { resolveVehicleImagesForList } from "@/server/services/vehicle-image.service";
-import { MAX_COMPARISON_VEHICLES, parseComparisonIdsFromSearchParam, reorderVehiclesByIds } from "@/lib/vehicle-comparison";
+import { isComparisonEligible, parseComparisonIdsFromSearchParam, reorderVehiclesByIds } from "@/lib/vehicle-comparison";
 import { ComparisonIncompleteState } from "@/components/vehicles/comparison-incomplete-state";
 import { ComparisonMatrix, type ComparisonPageVehicle } from "@/components/vehicles/comparison-matrix";
 
@@ -20,7 +20,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
   const resolvedSearchParams = await searchParams;
   const ids = parseComparisonIdsFromSearchParam(resolvedSearchParams.vehicles);
 
-  if (ids.length !== MAX_COMPARISON_VEHICLES) {
+  if (!isComparisonEligible(ids.length)) {
     return (
       <div className="container-page">
         <ComparisonIncompleteState reason="count" />
@@ -31,7 +31,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
   const items = await getPublicVehiclesByIds(ids);
   const ordered = reorderVehiclesByIds(items, ids);
 
-  if (ordered.length !== MAX_COMPARISON_VEHICLES) {
+  if (ordered.length !== ids.length) {
     return (
       <div className="container-page">
         <ComparisonIncompleteState reason="unavailable" />

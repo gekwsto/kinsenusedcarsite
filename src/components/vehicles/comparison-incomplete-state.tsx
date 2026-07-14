@@ -3,21 +3,23 @@
 import { NavigationLink as Link } from "@/components/navigation/navigation-link";
 import { Button } from "@/components/ui/button";
 import { useVehicleComparison } from "@/components/providers/vehicle-comparison-provider";
+import { MIN_COMPARISON_VEHICLES, MAX_COMPARISON_VEHICLES } from "@/lib/vehicle-comparison";
 
 interface ComparisonIncompleteStateProps {
   reason: "count" | "unavailable";
 }
 
 const REASON_COPY: Record<ComparisonIncompleteStateProps["reason"], string> = {
-  count: "Για να δείτε τη σύγκριση χρειάζονται ακριβώς 3 επιλεγμένα οχήματα.",
+  count: `Για να δείτε τη σύγκριση χρειάζονται από ${MIN_COMPARISON_VEHICLES} έως ${MAX_COMPARISON_VEHICLES} επιλεγμένα οχήματα.`,
   unavailable: "Ένα ή περισσότερα από τα επιλεγμένα οχήματα δεν είναι πλέον διαθέσιμα.",
 };
 
-// Rendered whenever /compare's `vehicles` query doesn't resolve to exactly
-// 3 real, currently-public vehicles — a mistyped/truncated/stale shared
-// link, or a link to vehicles that were later frozen/deleted. Never renders
-// a partial matrix (task requirement) — this is the only thing this route
-// shows in that case.
+// Rendered whenever /compare's `vehicles` query doesn't resolve to an
+// eligible (MIN_COMPARISON_VEHICLES..MAX_COMPARISON_VEHICLES) set of real,
+// currently-public vehicles — a mistyped/truncated/stale shared link, or a
+// link to vehicles that were later frozen/deleted. Never renders a partial
+// matrix (task requirement) — this is the only thing this route shows in
+// that case.
 export function ComparisonIncompleteState({ reason }: ComparisonIncompleteStateProps) {
   const { openSidebar } = useVehicleComparison();
 

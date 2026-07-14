@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Car, CarFront, Shapes, Fuel, Cog, Gauge, Zap, Box, Palette } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { VehicleGallery } from "@/components/vehicles/vehicle-gallery";
-import { InterestModalProvider, InterestModalTrigger } from "@/components/vehicles/interest-modal";
+import { InterestModalProvider } from "@/components/vehicles/interest-modal";
 import { VehiclePricingSection } from "@/components/vehicles/vehicle-pricing-section";
 import { VehicleGrid } from "@/components/vehicles/vehicle-grid";
 import { getPublicVehicleBySlug, getSimilarVehicles } from "@/server/services/vehicle.service";
@@ -125,27 +124,6 @@ export default async function VehicleDetailPage({ params }: { params: Promise<Pa
             ))}
           </div>
         </div>
-      </div>
-
-      {/* Secondary actions kept for LEASING app functionality beyond the reference (financing / test drive / general question) */}
-      <div className="mx-auto mt-4 flex max-w-[1200px] flex-wrap justify-center gap-3">
-        <InterestModalTrigger interestType="FINANCING" asChild>
-          <Button variant="outline">Ενδιαφέρομαι για Δανειοδότηση</Button>
-        </InterestModalTrigger>
-        <InterestModalTrigger interestType="TEST_DRIVE" asChild>
-          <Button variant="outline">Κλείστε Test Drive</Button>
-        </InterestModalTrigger>
-        <InterestModalTrigger interestType="GENERAL" asChild>
-          <Button variant="ghost" className="group">
-            <span className="relative inline-block origin-left transition-transform duration-[340ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-safe:group-hover:scale-[1.015] motion-safe:group-focus-visible:scale-[1.015]">
-              Ρωτήστε μας για αυτό το όχημα
-              <span
-                aria-hidden="true"
-                className="absolute bottom-[-4px] left-0 h-[2px] w-full origin-left scale-x-0 rounded-full bg-accent opacity-0 transition-[transform,opacity] duration-[320ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none group-hover:scale-x-100 group-hover:opacity-[0.78] group-focus-visible:scale-x-100 group-focus-visible:opacity-[0.78]"
-              />
-            </span>
-          </Button>
-        </InterestModalTrigger>
       </div>
 
       {similarVehicles.length > 0 && (

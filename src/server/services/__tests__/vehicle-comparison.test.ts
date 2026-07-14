@@ -2,11 +2,13 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   MAX_COMPARISON_VEHICLES,
+  MIN_COMPARISON_VEHICLES,
   VEHICLE_COMPARISON_STORAGE_VERSION,
   addComparisonId,
   areComparisonIdListsEqual,
   buildComparisonUrl,
   createEmptyComparisonState,
+  isComparisonEligible,
   parseComparisonIdsFromSearchParam,
   parseComparisonState,
   removeComparisonId,
@@ -101,21 +103,38 @@ test("buildComparisonUrl: null with 0 selected", () => {
   assert.equal(buildComparisonUrl([]), null);
 });
 
-test("buildComparisonUrl: null with 1 selected", () => {
+test("buildComparisonUrl: null with 1 selected (below MIN_COMPARISON_VEHICLES)", () => {
   assert.equal(buildComparisonUrl(["v1"]), null);
 });
 
-test("buildComparisonUrl: null with 2 selected", () => {
-  assert.equal(buildComparisonUrl(["v1", "v2"]), null);
+test("buildComparisonUrl: a valid, ordered URL with exactly MIN_COMPARISON_VEHICLES (2) selected", () => {
+  assert.equal(MIN_COMPARISON_VEHICLES, 2);
+  assert.equal(buildComparisonUrl(["v1", "v2"]), "/compare?vehicles=v1,v2");
 });
 
-test("buildComparisonUrl: a complete, ordered URL with exactly 3 selected", () => {
+test("buildComparisonUrl: a complete, ordered URL with exactly MAX_COMPARISON_VEHICLES (3) selected", () => {
   assert.equal(buildComparisonUrl(["v1", "v2", "v3"]), "/compare?vehicles=v1,v2,v3");
 });
 
 test("buildComparisonUrl: safely URI-encodes IDs containing reserved characters", () => {
   const url = buildComparisonUrl(["a b", "c&d", "e,f"]);
   assert.equal(url, `/compare?vehicles=${encodeURIComponent("a b")},${encodeURIComponent("c&d")},${encodeURIComponent("e,f")}`);
+});
+
+// ---------- isComparisonEligible ----------
+
+test("isComparisonEligible: false below MIN_COMPARISON_VEHICLES", () => {
+  assert.equal(isComparisonEligible(0), false);
+  assert.equal(isComparisonEligible(1), false);
+});
+
+test("isComparisonEligible: true for MIN_COMPARISON_VEHICLES through MAX_COMPARISON_VEHICLES", () => {
+  assert.equal(isComparisonEligible(2), true);
+  assert.equal(isComparisonEligible(3), true);
+});
+
+test("isComparisonEligible: false above MAX_COMPARISON_VEHICLES", () => {
+  assert.equal(isComparisonEligible(4), false);
 });
 
 // ---------- storage parser ----------

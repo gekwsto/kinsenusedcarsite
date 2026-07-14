@@ -127,7 +127,8 @@ test.describe("vehicle comparison — selection journey", () => {
     await expect(tray.panel).toBeVisible();
     await expect(tray.panel.getByText("1/3 επιλεγμένα")).toBeVisible();
     await expect(tray.cta).toBeDisabled();
-    await expect(tray.panel.getByText("Προσθέστε ακόμη 2 αυτοκίνητα για σύγκριση.")).toBeVisible();
+    // 1 selected is still below MIN_COMPARISON_VEHICLES (2) — 1 more is needed.
+    await expect(tray.panel.getByText("Προσθέστε ακόμη 1 αυτοκίνητο για σύγκριση.")).toBeVisible();
 
     // Close collapses, does not clear.
     await tray.panelClose.click();
@@ -152,9 +153,11 @@ test.describe("vehicle comparison — selection journey", () => {
     expect(secondCardName).not.toBe(firstCardName);
     await secondCard.getByRole("button", { name: "Προσθήκη στη σύγκριση" }).click();
 
+    // 2 selected already meets MIN_COMPARISON_VEHICLES — the CTA is enabled
+    // here, not just once a 3rd vehicle is added.
     await expect(tray.panel.getByText("2/3 επιλεγμένα")).toBeVisible();
-    await expect(tray.cta).toBeDisabled();
-    await expect(tray.panel.getByText("Προσθέστε ακόμη 1 αυτοκίνητο για σύγκριση.")).toBeVisible();
+    await expect(tray.cta).toBeEnabled();
+    await expect(tray.panel.getByText("Μπορείτε να δείτε τη σύγκριση ή να προσθέσετε ακόμη ένα αυτοκίνητο.")).toBeVisible();
     await tray.panelClose.click();
 
     // 3/3 — a vehicle-detail page for a third distinct vehicle.
@@ -188,6 +191,51 @@ test.describe("vehicle comparison — selection journey", () => {
     expect(renderedNames[0]?.trim()).toBe(firstCardName);
     expect(renderedNames[1]?.trim()).toBe(secondCardName);
     expect(renderedNames[2]?.trim()).toBe(thirdCardName);
+
+    assertNoRuntimeErrors(runtimeGuard);
+    assertNoFailedFirstPartyRequests(failedRequests);
+  });
+
+  test("a 2-vehicle selection (MIN_COMPARISON_VEHICLES) is enough: the CTA is enabled and /compare renders a complete 2-column comparison, no empty third slot", async ({ page }) => {
+    const runtimeGuard = attachRuntimeErrorGuard(page);
+    const failedRequests = attachFailedRequestGuard(page, "http://127.0.0.1:3099");
+
+    await page.goto("/vehicles");
+    await dismissBanner(page);
+
+    const firstCard = page.getByRole("group").filter({ has: compareToggle(page).notSelected }).first();
+    const firstCardName = await firstCard.getAttribute("aria-label");
+    await firstCard.getByRole("button", { name: "Προσθήκη στη σύγκριση" }).click();
+    // The desktop panel auto-opens after every add and, being a non-modal
+    // overlay, visually covers the grid's rightmost column — close it
+    // before locating/clicking the next card (see dismissBanner's sibling
+    // doc comment above for the same reasoning elsewhere in this file).
+    await closeComparisonUi(page);
+
+    const secondCard = page.getByRole("group").filter({ has: compareToggle(page).notSelected }).first();
+    const secondCardName = await secondCard.getAttribute("aria-label");
+    expect(secondCardName).not.toBe(firstCardName);
+    await secondCard.getByRole("button", { name: "Προσθήκη στη σύγκριση" }).click();
+
+    const tray = comparisonTray(page);
+    await expect(tray.panel.getByText("2/3 επιλεγμένα")).toBeVisible();
+    await expect(tray.cta).toBeEnabled();
+
+    await tray.cta.click();
+    await page.waitForURL(/\/compare\?vehicles=/);
+
+    // Exactly 2 vehicle columns — no undefined 3rd slot, no layout gap left
+    // by a stale fixed 3-column grid.
+    const summaryLinks = page.locator("main a[href^='/vehicles/']");
+    await expect(summaryLinks).toHaveCount(2);
+    const renderedNames = await summaryLinks.allTextContents();
+    expect(renderedNames[0]?.trim()).toBe(firstCardName);
+    expect(renderedNames[1]?.trim()).toBe(secondCardName);
+
+    // The matrix table also renders exactly 2 data columns per row (plus
+    // the leading label column), never a 3rd blank one.
+    const headerRow = page.locator("table thead tr");
+    await expect(headerRow.locator("th")).toHaveCount(3);
 
     assertNoRuntimeErrors(runtimeGuard);
     assertNoFailedFirstPartyRequests(failedRequests);
@@ -229,7 +277,8 @@ test.describe("vehicle comparison — fourth vehicle rejection and recovery", ()
     const firstSlotRemove = tray.panel.getByRole("button", { name: /^Αφαίρεση .+ από τη σύγκριση$/ }).first();
     await firstSlotRemove.click();
     await expect(tray.panel.getByText("2/3 επιλεγμένα")).toBeVisible();
-    await expect(tray.cta).toBeDisabled();
+    // 2 remaining still meets MIN_COMPARISON_VEHICLES — the CTA stays enabled.
+    await expect(tray.cta).toBeEnabled();
 
     await toggle.notSelected.first().click();
     await expect(tray.panel.getByText("3/3 επιλεγμένα")).toBeVisible();
@@ -393,7 +442,7 @@ test.describe("vehicle comparison — keyboard and focus", () => {
     await expect(tray.panel).toBeVisible();
   });
 
-  test("the comparison CTA is not activatable by keyboard while disabled, and works once enabled", async ({ page }) => {
+  test("the comparison CTA is not activatable by keyboard while disabled, and becomes enabled as soon as MIN_COMPARISON_VEHICLES (2) is reached", async ({ page }) => {
     await page.goto("/vehicles");
     await dismissBanner(page);
 
@@ -406,8 +455,8 @@ test.describe("vehicle comparison — keyboard and focus", () => {
 
     await closeComparisonUi(page);
     await toggle.notSelected.first().click();
-    await closeComparisonUi(page);
-    await toggle.notSelected.first().click();
+    // Exactly 2 selected — the CTA must already be enabled here, not only
+    // once a 3rd vehicle is added.
     await expect(tray.cta).toBeEnabled();
     await tray.cta.focus();
     await page.keyboard.press("Enter");
@@ -503,14 +552,14 @@ test.describe("vehicle comparison — responsive", () => {
 });
 
 test.describe("vehicle comparison — /compare route validation", () => {
-  test("fewer than 3 IDs shows a polished incomplete state, not a partial matrix", async ({ page }) => {
+  test("fewer than MIN_COMPARISON_VEHICLES (1) IDs shows a polished incomplete state, not a partial matrix", async ({ page }) => {
     await page.goto("/compare?vehicles=only-one-id");
     await expect(page.getByRole("heading", { name: "Η σύγκριση δεν είναι έτοιμη" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Επιστροφή στα αυτοκίνητα" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Άνοιγμα επιλογών σύγκρισης" })).toBeVisible();
   });
 
-  test("more than 3 IDs shows the incomplete state", async ({ page }) => {
+  test("more than MAX_COMPARISON_VEHICLES (4) IDs shows the incomplete state", async ({ page }) => {
     await page.goto("/compare?vehicles=a,b,c,d");
     await expect(page.getByRole("heading", { name: "Η σύγκριση δεν είναι έτοιμη" })).toBeVisible();
   });
@@ -522,9 +571,144 @@ test.describe("vehicle comparison — /compare route validation", () => {
     assertNoRuntimeErrors(runtimeGuard);
   });
 
+  test("2 unresolvable/invalid IDs (a syntactically eligible count) also shows the unavailable-reason incomplete state, never a crash or partial matrix", async ({ page }) => {
+    const runtimeGuard = attachRuntimeErrorGuard(page);
+    await page.goto("/compare?vehicles=nope-1,nope-2");
+    await expect(page.getByRole("heading", { name: "Η σύγκριση δεν είναι έτοιμη" })).toBeVisible();
+    assertNoRuntimeErrors(runtimeGuard);
+  });
+
   test("no route param at all shows the incomplete state", async ({ page }) => {
     await page.goto("/compare");
     await expect(page.getByRole("heading", { name: "Η σύγκριση δεν είναι έτοιμη" })).toBeVisible();
+  });
+});
+
+// Regression coverage for a real bug: the vehicle summary header and the
+// comparison table below it used to be two independently-templated
+// elements (a bare N-column CSS grid with no left offset, sitting above a
+// <table> that implicitly reserved space for its own row-label column) —
+// so a vehicle's summary card (and its remove button) rendered at a
+// different horizontal position than that same vehicle's data column,
+// making the header look broken/disconnected once a real screenshot was
+// taken. These tests assert the header and body are structurally the same
+// table (so they can never drift apart again) and that each remove button
+// is geometrically contained within its own vehicle's column, not some
+// other column or a standalone slot.
+test.describe("vehicle comparison — /compare column alignment", () => {
+  async function goToCompareWith(page: Page, count: 2 | 3) {
+    await page.goto("/vehicles");
+    await dismissBanner(page);
+    const addBtn = () => page.getByRole("button", { name: "Προσθήκη στη σύγκριση" }).first();
+    for (let i = 0; i < count; i++) {
+      await addBtn().click();
+      await closeComparisonUi(page);
+    }
+    const url = await page.evaluate((key) => {
+      const raw = window.localStorage.getItem(key);
+      const ids = raw ? (JSON.parse(raw).ids as string[]) : [];
+      return "/compare?vehicles=" + ids.join(",");
+    }, STORAGE_KEY);
+    await page.goto(url);
+    await page.waitForLoadState("networkidle");
+  }
+
+  async function assertColumnsAndButtonsAligned(page: Page, vehicleCount: number) {
+    // Header and body live in the same <table>: exactly one label column
+    // plus one column per vehicle, everywhere in the table, no extra slots.
+    const headerCells = page.locator("table thead th");
+    await expect(headerCells).toHaveCount(vehicleCount + 1);
+
+    const removeButtons = page.locator("table thead button[aria-label^='Αφαίρεση ']");
+    await expect(removeButtons).toHaveCount(vehicleCount);
+
+    // Each remove button must be a DOM descendant of its own vehicle's
+    // header cell (never a sibling/standalone grid item), and its
+    // bounding box must fall entirely inside that same cell's bounding
+    // box — the geometric proof that it visually belongs to that vehicle
+    // and not to a neighboring column.
+    for (let i = 1; i <= vehicleCount; i++) {
+      const cell = headerCells.nth(i);
+      const button = cell.locator("button[aria-label^='Αφαίρεση ']");
+      await expect(button).toHaveCount(1);
+
+      const cellBox = await cell.boundingBox();
+      const buttonBox = await button.boundingBox();
+      expect(cellBox).not.toBeNull();
+      expect(buttonBox).not.toBeNull();
+      expect(buttonBox!.x).toBeGreaterThanOrEqual(cellBox!.x);
+      expect(buttonBox!.x + buttonBox!.width).toBeLessThanOrEqual(cellBox!.x + cellBox!.width + 0.5);
+      expect(buttonBox!.y).toBeGreaterThanOrEqual(cellBox!.y);
+    }
+
+    // First body row's vehicle cells must span exactly the same
+    // left/right positions as the header cells directly above them —
+    // the actual alignment guarantee this whole fix is about.
+    const bodyRow = page.locator("table tbody tr").nth(1);
+    const bodyCells = bodyRow.locator("td");
+    await expect(bodyCells).toHaveCount(vehicleCount);
+    for (let i = 0; i < vehicleCount; i++) {
+      const headerBox = await headerCells.nth(i + 1).boundingBox();
+      const bodyBox = await bodyCells.nth(i).boundingBox();
+      expect(Math.abs(headerBox!.x - bodyBox!.x)).toBeLessThanOrEqual(0.5);
+      expect(Math.abs(headerBox!.width - bodyBox!.width)).toBeLessThanOrEqual(0.5);
+    }
+  }
+
+  test("2 vehicles: exactly 2 aligned summary columns, each with its own contained remove button, no artificial 3rd slot", async ({ page }) => {
+    await goToCompareWith(page, 2);
+    await assertColumnsAndButtonsAligned(page, 2);
+
+    // With 2 vehicles the two columns are also equal width (the label
+    // column has a fixed width and, per table-layout:fixed, the remaining
+    // space splits evenly between columns given none of them declares an
+    // explicit width of its own).
+    const headerCells = page.locator("table thead th");
+    const col1 = await headerCells.nth(1).boundingBox();
+    const col2 = await headerCells.nth(2).boundingBox();
+    expect(Math.abs(col1!.width - col2!.width)).toBeLessThanOrEqual(1);
+  });
+
+  test("3 vehicles: 3 correctly aligned columns, no overlap, no clipped remove buttons", async ({ page }) => {
+    await goToCompareWith(page, 3);
+    await assertColumnsAndButtonsAligned(page, 3);
+
+    // Equal-width vehicle columns, same reasoning as the 2-vehicle case,
+    // and no column overlaps its neighbor.
+    const headerCells = page.locator("table thead th");
+    const box1 = (await headerCells.nth(1).boundingBox())!;
+    const box2 = (await headerCells.nth(2).boundingBox())!;
+    const box3 = (await headerCells.nth(3).boundingBox())!;
+    expect(Math.abs(box1.width - box2.width)).toBeLessThanOrEqual(1);
+    expect(Math.abs(box2.width - box3.width)).toBeLessThanOrEqual(1);
+    expect(box1.x + box1.width).toBeLessThanOrEqual(box2.x + 0.5);
+    expect(box2.x + box2.width).toBeLessThanOrEqual(box3.x + 0.5);
+  });
+
+  test("the desktop comparison tray closes automatically on arrival, so it never covers the matrix it duplicates", async ({ page }) => {
+    await page.goto("/vehicles");
+    await dismissBanner(page);
+    const addBtn = () => page.getByRole("button", { name: "Προσθήκη στη σύγκριση" }).first();
+    // Deliberately leave the tray open (no closeComparisonUi) — this is
+    // the real, ordinary path: the tray auto-opens on every add, and its
+    // own CTA is what most visitors click to get here. The 2nd add is
+    // activated by keyboard rather than a mouse click: the now-open panel
+    // visually covers the grid's rightmost column, and a real pointer
+    // click can legitimately get intercepted by it (a separate, pre-
+    // existing actionability quirk, not what this test is about) — Enter
+    // on a focused button activates it regardless of what else is drawn
+    // on top, exactly like a keyboard user actually would here.
+    await addBtn().click();
+    await addBtn().focus();
+    await page.keyboard.press("Enter");
+    const cta = page.getByRole("button", { name: "Δείτε τη σύγκριση" }).or(page.getByRole("link", { name: "Δείτε τη σύγκριση" }));
+    await cta.click();
+    await page.waitForURL(/\/compare\?vehicles=/);
+
+    await expect(page.getByRole("complementary", { name: "Σύγκριση οχημάτων" })).toBeHidden();
+    // The redundant tray is gone, but the selection itself is untouched —
+    // still reachable via the collapsed pill, still 2 selected.
+    await expect(page.getByRole("button", { name: /Άνοιγμα σύγκρισης οχημάτων, 2 από 3/ })).toBeVisible();
   });
 });
 

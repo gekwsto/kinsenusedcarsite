@@ -38,11 +38,15 @@ function useIsDesktopViewport(): boolean {
   return isDesktop;
 }
 
-function progressCopy(count: number): string {
-  if (count === 1) return "Προσθέστε ακόμη 2 αυτοκίνητα για σύγκριση.";
-  if (count === 2) return "Προσθέστε ακόμη 1 αυτοκίνητο για σύγκριση.";
-  if (count === 3) return "Τα αυτοκίνητα είναι έτοιμα για σύγκριση.";
-  return "Προσθέστε αυτοκίνητα για να ξεκινήσετε τη σύγκριση.";
+/** `min`/`max` are always MIN_COMPARISON_VEHICLES/MAX_COMPARISON_VEHICLES, passed in from context rather than imported directly so this stays consistent with whatever canCompare/comparisonUrl actually decided. */
+function progressCopy(count: number, min: number, max: number): string {
+  if (count === 0) return "Προσθέστε αυτοκίνητα για να ξεκινήσετε τη σύγκριση.";
+  if (count < min) {
+    const remaining = min - count;
+    return `Προσθέστε ακόμη ${remaining} αυτοκίνητ${remaining === 1 ? "ο" : "α"} για σύγκριση.`;
+  }
+  if (count < max) return "Μπορείτε να δείτε τη σύγκριση ή να προσθέσετε ακόμη ένα αυτοκίνητο.";
+  return "Τα αυτοκίνητα είναι έτοιμα για σύγκριση.";
 }
 
 function ComparisonSlot({ index, vehicle, onRemove }: { index: number; vehicle: VehicleComparisonSummary | undefined; onRemove: (id: string) => void }) {
@@ -88,7 +92,7 @@ function ComparisonSlot({ index, vehicle, onRemove }: { index: number; vehicle: 
 }
 
 function PanelBody({ titleId }: { titleId: string }) {
-  const { selectedVehicles, selectedCount, maxVehicles, removeVehicle, clearVehicles, canCompare, comparisonUrl } = useVehicleComparison();
+  const { selectedVehicles, selectedCount, maxVehicles, minVehicles, removeVehicle, clearVehicles, canCompare, comparisonUrl } = useVehicleComparison();
   const slots = Array.from({ length: maxVehicles }, (_, index) => selectedVehicles[index]);
 
   return (
@@ -120,7 +124,7 @@ function PanelBody({ titleId }: { titleId: string }) {
       </div>
 
       <div className="mt-5 border-t border-border pt-4">
-        <p className="mb-3 text-sm text-ink-muted">{progressCopy(selectedCount)}</p>
+        <p className="mb-3 text-sm text-ink-muted">{progressCopy(selectedCount, minVehicles, maxVehicles)}</p>
         {canCompare && comparisonUrl ? (
           <Button asChild variant="primary" className="w-full">
             <Link href={comparisonUrl}>Δείτε τη σύγκριση</Link>

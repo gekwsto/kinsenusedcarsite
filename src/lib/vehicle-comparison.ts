@@ -15,6 +15,9 @@ export const VEHICLE_COMPARISON_STORAGE_VERSION = 1;
 /** Hard cap enforced everywhere: the provider, the parser, and the `/compare` route. */
 export const MAX_COMPARISON_VEHICLES = 3;
 
+/** Minimum selection required to view a comparison — enforced everywhere alongside MAX_COMPARISON_VEHICLES (the provider's `canCompare`, the `/compare` route's validation, and `buildComparisonUrl`). A single vehicle has nothing to compare against. */
+export const MIN_COMPARISON_VEHICLES = 2;
+
 export interface VehicleComparisonStoredState {
   version: number;
   /** Ordered, unique, public vehicle IDs — never full vehicle records (see reports/vehicle_comparison_feature_lock.json for the storage-classification rationale). */
@@ -126,9 +129,14 @@ export function parseComparisonIdsFromSearchParam(raw: string | null | undefined
   return result;
 }
 
-/** Builds the shareable `/compare` URL for a complete (exactly MAX_COMPARISON_VEHICLES) ordered ID list. Returns null for any incomplete list — there is deliberately no "partial comparison" URL. */
+/** Whether `count` selected vehicles is eligible to view a comparison — the single shared business rule (MIN_COMPARISON_VEHICLES..MAX_COMPARISON_VEHICLES inclusive) used by the sidebar/tray CTA, `syncSelectionFromUrl`, and the `/compare` route's own validation, so the range is never duplicated as separate magic numbers. */
+export function isComparisonEligible(count: number): boolean {
+  return count >= MIN_COMPARISON_VEHICLES && count <= MAX_COMPARISON_VEHICLES;
+}
+
+/** Builds the shareable `/compare` URL for an eligible (MIN_COMPARISON_VEHICLES..MAX_COMPARISON_VEHICLES) ordered ID list. Returns null for any ineligible list — there is deliberately no "partial comparison" URL below the minimum. */
 export function buildComparisonUrl(ids: readonly string[]): string | null {
-  if (ids.length !== MAX_COMPARISON_VEHICLES) return null;
+  if (!isComparisonEligible(ids.length)) return null;
   return `/compare?vehicles=${ids.map(encodeURIComponent).join(",")}`;
 }
 
