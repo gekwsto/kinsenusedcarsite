@@ -5,6 +5,7 @@
  * "never let an email failure break lead submission" orchestration.
  */
 import type { Lead, Vehicle } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import { escapeHtml, sendEmail } from "@/lib/email";
 import { getSiteSettings, DEFAULT_SITE_SETTINGS, type SiteSettings } from "@/server/services/settings.service";
 import { formatEuro } from "@/lib/utils";
@@ -77,7 +78,7 @@ function htmlShell(title: string, bodyHtml: string): string {
  */
 export function buildCustomerConfirmationEmail(lead: LeadWithVehicle, settings: SiteSettings): EmailContent {
   const interestLabel = INTEREST_TYPE_LABELS[lead.interestType];
-  const vehicleLine = lead.vehicle ? `${lead.vehicle.maker} ${lead.vehicle.model}` : null;
+  const vehicleLine = lead.vehicle ? `${lead.vehicle.maker} ${lead.vehicle.versionName}` : null;
   const publicUrl = vehiclePublicUrl(lead.vehicle);
 
   const subject = "Λάβαμε το ενδιαφέρον σας — Kinsen";
@@ -139,7 +140,7 @@ export function buildInternalNotificationEmail(lead: LeadWithVehicle): EmailCont
 
   const vehicleTextLines = lead.vehicle
     ? [
-        `Όχημα: ${lead.vehicle.maker} ${lead.vehicle.model}`,
+        `Όχημα: ${lead.vehicle.maker} ${lead.vehicle.versionName}`,
         `Έτος: ${lead.vehicle.yearRelease ?? "-"}`,
         `Τιμή: ${formatEuro(lead.vehicle.price?.toString())}`,
         `Μηνιαίο: ${formatEuro(lead.vehicle.monthlyPrice?.toString())}`,
@@ -163,7 +164,7 @@ export function buildInternalNotificationEmail(lead: LeadWithVehicle): EmailCont
 
   const vehicleHtmlRows = lead.vehicle
     ? [
-        row("Όχημα", `${lead.vehicle.maker} ${lead.vehicle.model}`),
+        row("Όχημα", `${lead.vehicle.maker} ${lead.vehicle.versionName}`),
         row("Έτος", String(lead.vehicle.yearRelease ?? "-")),
         row("Τιμή", formatEuro(lead.vehicle.price?.toString())),
         row("Μηνιαίο", formatEuro(lead.vehicle.monthlyPrice?.toString())),
@@ -204,13 +205,53 @@ export interface NotifyLeadCreatedResult {
 }
 
 /**
+ * Creates the CRM Interaction for a Lead and, only on success, stamps
+ * `crmSyncedAt` so a later duplicate-submission retry (see
+ * retryCrmSyncIfPending below) can tell "already synced, never touch again"
+ * apart from "never synced, safe to retry". Never throws — every caller
+ * treats CRM sync as best-effort.
+ */
+async function syncLeadToCrm(lead: LeadWithVehicle): Promise<boolean> {
+  try {
+    if (!isCrmConfigured()) {
+      console.warn("[lead-notification] CRM_API_BASE_URL not configured — skipping CRM lead creation");
+      return false;
+    }
+    if (!isSupportedInterestType(lead.interestType)) {
+      // Routine, not noteworthy: FINANCING/TEST_DRIVE/GENERAL simply have no
+      // FlowId mapping yet, unlike a real failure. No error/warn log here —
+      // logging one on every such lead would just be noise.
+      return false;
+    }
+
+    await createCrmLead(lead);
+
+    await prisma.lead.update({ where: { id: lead.id }, data: { crmSyncedAt: new Date() } }).catch((error) => {
+      // The CRM Interaction was created successfully — this only means the
+      // *local* bookkeeping of that fact failed. Surfacing it separately
+      // (rather than as a false "CRM failed") avoids a spurious retry that
+      // would create a second Interaction for the same Lead.
+      console.error(
+        `[lead-notification] CRM lead created for ${lead.id} but failed to persist crmSyncedAt`,
+        safeErrorMessage(error),
+      );
+    });
+    return true;
+  } catch (error) {
+    console.error(`[lead-notification] failed to create CRM lead for local lead ${lead.id}`, safeErrorMessage(error));
+    return false;
+  }
+}
+
+/**
  * Fires both lead emails, and creates the corresponding CRM Lead, after a
  * successful DB write. Never throws: each of the three actions is
  * independently try/caught so one failing (or being unconfigured) can never
  * suppress the other two, and a bug here can never turn an already-saved
  * Lead into a failed HTTP response for the caller. Call this only for
- * genuinely new leads — retried/duplicate submissions must skip it entirely
- * (see the `isDuplicate` check at the call site in /api/leads/route.ts).
+ * genuinely new leads — retried/duplicate submissions must skip the emails
+ * entirely and go through retryCrmSyncIfPending() instead (see the
+ * `isDuplicate` check at the call site in /api/leads/route.ts).
  */
 export async function notifyLeadCreated(lead: LeadWithVehicle): Promise<NotifyLeadCreatedResult> {
   const settings = await getSiteSettings().catch((error) => {
@@ -241,21 +282,22 @@ export async function notifyLeadCreated(lead: LeadWithVehicle): Promise<NotifyLe
     console.error(`[lead-notification] failed to send customer confirmation for lead ${lead.id}`, safeErrorMessage(error));
   }
 
-  let crmSent = false;
-  try {
-    if (!isCrmConfigured()) {
-      console.warn("[lead-notification] CRM_API_BASE_URL not configured — skipping CRM lead creation");
-    } else if (!isSupportedInterestType(lead.interestType)) {
-      // Routine, not noteworthy: FINANCING/TEST_DRIVE/GENERAL simply have no
-      // FlowId mapping yet, unlike a real failure. No error/warn log here —
-      // logging one on every such lead would just be noise.
-    } else {
-      await createCrmLead(lead);
-      crmSent = true;
-    }
-  } catch (error) {
-    console.error(`[lead-notification] failed to create CRM lead for local lead ${lead.id}`, safeErrorMessage(error));
-  }
+  const crmSent = await syncLeadToCrm(lead);
 
   return { internalSent, customerSent, crmSent };
+}
+
+/**
+ * Called instead of notifyLeadCreated() when /api/leads detects a duplicate
+ * submission (same submissionId as an existing Lead). Both emails were
+ * already sent (or attempted) on the original submission and must never
+ * fire again — but unlike emails, CRM sync has a reliable done/not-done
+ * marker (`crmSyncedAt`), so a Lead whose original CRM sync failed (CRM
+ * outage, timeout, ...) can still recover on a later retry, while a Lead
+ * whose CRM sync already succeeded is guaranteed to never get a second
+ * Interaction.
+ */
+export async function retryCrmSyncIfPending(lead: LeadWithVehicle): Promise<boolean> {
+  if (lead.crmSyncedAt) return false;
+  return syncLeadToCrm(lead);
 }

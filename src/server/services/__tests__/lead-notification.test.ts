@@ -1,4 +1,4 @@
-import { test, type TestContext } from "node:test";
+import { test, beforeEach, afterEach, type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import nodemailer from "nodemailer";
 import { Prisma, type Lead, type Vehicle } from "@prisma/client";
@@ -7,6 +7,7 @@ import { sendEmail } from "@/lib/email";
 import { createLead } from "@/server/services/lead.service";
 import {
   notifyLeadCreated,
+  retryCrmSyncIfPending,
   buildCustomerConfirmationEmail,
   buildInternalNotificationEmail,
   type LeadWithVehicle,
@@ -14,20 +15,43 @@ import {
 import { DEFAULT_SITE_SETTINGS } from "@/server/services/settings.service";
 import type { CreateLeadInput } from "@/lib/validators/lead.schema";
 
+// This suite runs with the real .env loaded (see package.json's `test`
+// script), which — now that the CRM integration bug is fixed — has a real
+// CRM_API_BASE_URL configured. Every test in this file must stay safe
+// against that by default: only a test that explicitly opts in via
+// withCrmEnv(t) (or explicitly deletes it) should ever see CRM as
+// configured. Without this, any test that exercises notifyLeadCreated /
+// retryCrmSyncIfPending without mocking fetch would fire a real unmocked
+// HTTP request at the live CRM on every test run.
+let realCrmApiBaseUrl: string | undefined;
+beforeEach(() => {
+  realCrmApiBaseUrl = process.env.CRM_API_BASE_URL;
+  delete process.env.CRM_API_BASE_URL;
+});
+afterEach(() => {
+  if (realCrmApiBaseUrl === undefined) delete process.env.CRM_API_BASE_URL;
+  else process.env.CRM_API_BASE_URL = realCrmApiBaseUrl;
+});
+
 // The route (`POST /api/leads`) also calls next-auth's `auth()`, which
 // throws ("headers was called outside a request scope") unless invoked by
 // a real Next.js request — it cannot be called directly from a plain
-// node:test function. So these tests exercise the same two calls the route
+// node:test function. So these tests exercise the same calls the route
 // makes, in the same order, directly:
 //
 //   const { lead, isDuplicate } = await createLead(input, opts);
 //   if (!isDuplicate) await notifyLeadCreated(lead);
+//   else await retryCrmSyncIfPending(lead);
 //
 // See src/app/api/leads/route.ts for the real (thin) wiring around this.
 async function submitLeadLikeRoute(input: CreateLeadInput) {
   const result = await createLead(input, { source: "website" });
   if (!result.isDuplicate) {
     await notifyLeadCreated(result.lead).catch(() => {
+      // mirrors route.ts's defense-in-depth catch
+    });
+  } else {
+    await retryCrmSyncIfPending(result.lead).catch(() => {
       // mirrors route.ts's defense-in-depth catch
     });
   }
@@ -176,6 +200,7 @@ function fakeLead(overrides: Partial<Lead> = {}, vehicle: Vehicle | null = fakeV
     source: "website",
     internalNotes: null,
     submissionId: null,
+    crmSyncedAt: null,
     createdAt: new Date("2026-07-13T10:00:00Z"),
     updatedAt: new Date("2026-07-13T10:00:00Z"),
     ...overrides,
@@ -513,6 +538,79 @@ test("CRM call sends no Authorization header (the real endpoint needs none)", as
   assert.equal(interactionCalls.length, 1);
   const headers = interactionCalls[0]!.init.headers as Record<string, string>;
   assert.equal("Authorization" in headers, false);
+});
+
+// ---------- CRM retry on duplicate submission (crmSyncedAt) ----------
+
+test("a duplicate submission retries CRM sync when the original attempt's CRM sync failed", async (t) => {
+  if (await skipIfDbUnreachable(t)) return;
+  withSmtpEnv(t);
+  withCrmEnv(t);
+  const email = uniqueEmail();
+  const submissionId = crypto.randomUUID();
+  t.after(() => cleanupLeadsByEmail(email));
+  mockTransport(t);
+
+  // First attempt: Lead + emails succeed, CRM fails (simulated outage).
+  let shouldFail = true;
+  const { interactionCalls } = mockCrmFetch(t, () =>
+    shouldFail
+      ? new Response("Internal Server Error", { status: 500 })
+      : new Response(JSON.stringify({ Id: 999 }), { status: 200 }),
+  );
+
+  const first = await submitLeadLikeRoute(baseInput({ email, submissionId }));
+  assert.equal(first.isDuplicate, false);
+  assert.equal(interactionCalls.length, 1, "CRM sync must have been attempted on the original submission");
+
+  let stored = await prisma.lead.findUnique({ where: { id: first.lead.id } });
+  assert.equal(stored?.crmSyncedAt, null, "crmSyncedAt must still be null after a failed CRM sync");
+
+  // Retry: same submissionId (duplicate), CRM now succeeds.
+  shouldFail = false;
+  const second = await submitLeadLikeRoute(baseInput({ email, submissionId }));
+  assert.equal(second.isDuplicate, true, "must still be recognized as the same Lead, not a new one");
+  assert.equal(interactionCalls.length, 2, "the retry must call CRM again since it never succeeded");
+
+  stored = await prisma.lead.findUnique({ where: { id: first.lead.id } });
+  assert.ok(stored?.crmSyncedAt, "crmSyncedAt must be set once the retried CRM sync succeeds");
+
+  const count = await prisma.lead.count({ where: { email } });
+  assert.equal(count, 1, "the retry must never create a second local Lead row");
+});
+
+test("a duplicate submission does NOT retry CRM sync once it already succeeded (no duplicate Interaction)", async (t) => {
+  if (await skipIfDbUnreachable(t)) return;
+  withSmtpEnv(t);
+  withCrmEnv(t);
+  const email = uniqueEmail();
+  const submissionId = crypto.randomUUID();
+  t.after(() => cleanupLeadsByEmail(email));
+  mockTransport(t);
+  const { interactionCalls } = mockCrmFetch(t);
+
+  const first = await submitLeadLikeRoute(baseInput({ email, submissionId }));
+  assert.equal(first.isDuplicate, false);
+  assert.equal(interactionCalls.length, 1);
+
+  const second = await submitLeadLikeRoute(baseInput({ email, submissionId }));
+  assert.equal(second.isDuplicate, true);
+
+  assert.equal(interactionCalls.length, 1, "a Lead whose CRM sync already succeeded must never get a second Interaction");
+});
+
+test("retryCrmSyncIfPending is a no-op (returns false, never calls fetch) once crmSyncedAt is set", async (t) => {
+  if (await skipIfDbUnreachable(t)) return;
+  withCrmEnv(t);
+  const fetchMock = t.mock.method(globalThis, "fetch", async () => {
+    throw new Error("fetch must not be called for an already-synced lead");
+  });
+
+  const lead = fakeLead({ crmSyncedAt: new Date("2026-07-14T00:00:00Z") });
+  const result = await retryCrmSyncIfPending(lead);
+
+  assert.equal(result, false);
+  assert.equal(fetchMock.mock.calls.length, 0);
 });
 
 test("an unsupported interest type (FINANCING) is safely skipped without a CRM call, emails still run", async (t) => {

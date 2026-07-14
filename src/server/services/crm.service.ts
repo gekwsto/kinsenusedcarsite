@@ -143,7 +143,7 @@ function getSiteUrl(): string {
  */
 export function buildCrmLeadPayload(lead: LeadWithVehicle, config: CrmConfig, flowId: number): CrmLeadPayload {
   const interestLabel = INTEREST_TYPE_LABELS[lead.interestType];
-  const vehicleLine = lead.vehicle ? `${lead.vehicle.maker} ${lead.vehicle.model}` : null;
+  const vehicleLine = lead.vehicle ? `${lead.vehicle.maker} ${lead.vehicle.versionName}` : null;
   const vehicleUrl = lead.vehicle ? `${getSiteUrl()}/vehicles/${lead.vehicle.slug}` : null;
 
   const commentLines = [
@@ -181,6 +181,33 @@ function errorMessage(error: unknown): string {
 }
 
 /**
+ * Logs a CRM failure with enough to diagnose it (endpoint, FlowId, HTTP
+ * status/content-type, a truncated snippet of the CRM's OWN response body)
+ * without ever logging the outgoing payload itself (which carries the
+ * customer's name/email/phone) or any secret/credential — there are none to
+ * log here since this integration sends no Authorization header at all.
+ */
+function logCrmFailure(details: {
+  url: string;
+  flowId: number;
+  kind: "config" | "unsupported" | "network" | "timeout" | "http_error";
+  status?: number;
+  contentType?: string | null;
+  bodySnippet?: string;
+  message: string;
+}) {
+  console.error("[crm] CreateInteraction failed", {
+    endpoint: details.url,
+    flowId: details.flowId,
+    kind: details.kind,
+    status: details.status,
+    contentType: details.contentType,
+    bodySnippet: details.bodySnippet,
+    message: details.message,
+  });
+}
+
+/**
  * Creates the corresponding CRM Interaction (this integration's "Lead").
  * Throws on any failure (missing config, unsupported interest type,
  * network error, timeout, non-2xx) — by design, so the caller
@@ -215,11 +242,22 @@ export async function createCrmLead(lead: LeadWithVehicle): Promise<unknown> {
       signal: AbortSignal.timeout(config.timeoutMs),
     });
   } catch (error) {
-    throw new Error(`CRM request failed: ${errorMessage(error)}`);
+    const kind = error instanceof Error && error.name === "TimeoutError" ? "timeout" : "network";
+    const message = `CRM request failed: ${errorMessage(error)}`;
+    logCrmFailure({ url, flowId, kind, message });
+    throw new Error(message);
   }
 
+  const contentType = response.headers.get("content-type");
+
   if (!response.ok) {
-    throw new Error(`CRM lead creation returned HTTP ${response.status}`);
+    const bodySnippet = await response
+      .text()
+      .then((text) => text.slice(0, 500))
+      .catch(() => "");
+    const message = `CRM lead creation returned HTTP ${response.status}`;
+    logCrmFailure({ url, flowId, kind: "http_error", status: response.status, contentType, bodySnippet, message });
+    throw new Error(message);
   }
 
   return response.json().catch(() => null);

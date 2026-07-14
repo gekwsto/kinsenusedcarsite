@@ -171,6 +171,14 @@ model Lead {
   // without a key (or from older clients) never collide with each other.
   submissionId String? @unique
 
+  // Set only after createCrmLead() returns successfully. Nullable, not a
+  // boolean: this is what lets a retried submission (same submissionId) tell
+  // "CRM already succeeded, never touch it again" apart from "CRM was never
+  // reached/failed last time, safe to retry" — without it, a duplicate
+  // submission had no way to distinguish the two and CRM sync could never
+  // recover from a transient failure on the original attempt.
+  crmSyncedAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

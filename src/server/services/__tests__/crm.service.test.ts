@@ -98,6 +98,7 @@ function fakeLead(overrides: Partial<LeadWithVehicle> = {}, vehicle: Vehicle | n
     source: "website",
     internalNotes: null,
     submissionId: null,
+    crmSyncedAt: null,
     createdAt: new Date("2026-07-13T10:00:00Z"),
     updatedAt: new Date("2026-07-13T10:00:00Z"),
     ...overrides,
@@ -290,10 +291,32 @@ test("createCrmLead: throws when CRM_API_BASE_URL is missing", async (t) => {
   await assert.rejects(createCrmLead(fakeLead()));
 });
 
-test("createCrmLead: throws on a non-2xx response", async (t) => {
+test("createCrmLead: throws on a non-2xx response (500)", async (t) => {
   withCrmEnv(t);
   mockFetchOnce(t, () => new Response("Internal Server Error", { status: 500 }));
   await assert.rejects(createCrmLead(fakeLead()));
+});
+
+test("createCrmLead: throws on a non-2xx response (400) and logs status/content-type/body safely", async (t) => {
+  withCrmEnv(t);
+  const errorLog = t.mock.method(console, "error", () => {});
+  mockFetchOnce(
+    t,
+    () =>
+      new Response(JSON.stringify({ error: "No Account was found with key: 0." }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      }),
+  );
+
+  await assert.rejects(createCrmLead(fakeLead()));
+
+  assert.equal(errorLog.mock.calls.length, 1);
+  const [, details] = errorLog.mock.calls[0]!.arguments as [string, Record<string, unknown>];
+  assert.equal(details.status, 400);
+  assert.equal(details.contentType, "application/json");
+  assert.match(String(details.bodySnippet), /No Account was found/);
+  assert.equal(details.kind, "http_error");
 });
 
 test("createCrmLead: throws on a network failure", async (t) => {
@@ -302,4 +325,33 @@ test("createCrmLead: throws on a network failure", async (t) => {
     throw new Error("simulated network failure");
   });
   await assert.rejects(createCrmLead(fakeLead()));
+});
+
+test("createCrmLead: throws on a timeout and logs kind=timeout", async (t) => {
+  withCrmEnv(t);
+  const errorLog = t.mock.method(console, "error", () => {});
+  t.mock.method(globalThis, "fetch", async () => {
+    const err = new Error("The operation was aborted");
+    err.name = "TimeoutError";
+    throw err;
+  });
+
+  await assert.rejects(createCrmLead(fakeLead()));
+
+  assert.equal(errorLog.mock.calls.length, 1);
+  const [, details] = errorLog.mock.calls[0]!.arguments as [string, Record<string, unknown>];
+  assert.equal(details.kind, "timeout");
+});
+
+test("createCrmLead: never logs the outgoing payload (customer name/email/phone)", async (t) => {
+  withCrmEnv(t);
+  const errorLog = t.mock.method(console, "error", () => {});
+  mockFetchOnce(t, () => new Response("Internal Server Error", { status: 500 }));
+
+  const lead = fakeLead({ email: "sensitive-customer@example.com", phone: "6900000001" });
+  await assert.rejects(createCrmLead(lead));
+
+  const loggedText = JSON.stringify(errorLog.mock.calls.map((c) => c.arguments));
+  assert.ok(!loggedText.includes("sensitive-customer@example.com"));
+  assert.ok(!loggedText.includes("6900000001"));
 });

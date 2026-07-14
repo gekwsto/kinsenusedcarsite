@@ -51,6 +51,7 @@ test(
       source: "smoke-test",
       internalNotes: null,
       submissionId: null,
+      crmSyncedAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),
       vehicle: null,

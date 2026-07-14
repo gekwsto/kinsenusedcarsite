@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { getClientIp, isRateLimited } from "@/lib/rate-limit";
 import { createLeadSchema } from "@/lib/validators/lead.schema";
 import { createLead } from "@/server/services/lead.service";
-import { notifyLeadCreated } from "@/server/services/lead-notification.service";
+import { notifyLeadCreated, retryCrmSyncIfPending } from "@/server/services/lead-notification.service";
 
 const RATE_LIMIT = 5;
 const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
@@ -49,6 +49,17 @@ export async function POST(request: NextRequest) {
         await notifyLeadCreated(lead);
       } catch (error) {
         console.error(`Lead ${lead.id} was saved but notification dispatch threw unexpectedly`, error);
+      }
+    } else {
+      // Emails must never re-send on a duplicate — but the original
+      // attempt's CRM sync may have failed (CRM outage, timeout, ...) while
+      // the Lead and emails still succeeded. retryCrmSyncIfPending() is a
+      // no-op once crmSyncedAt is set, so retrying here can never create a
+      // second CRM Interaction for the same Lead.
+      try {
+        await retryCrmSyncIfPending(lead);
+      } catch (error) {
+        console.error(`Lead ${lead.id} duplicate submission: CRM retry threw unexpectedly`, error);
       }
     }
 
