@@ -1,0 +1,89 @@
+services:
+  kinsenusedcars-db:
+    image: postgres:16-bookworm
+    container_name: kinsenusedcars-db
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+    volumes:
+      - kinsenusedcars_postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+    networks:
+      - kinsenusedcars-network
+
+
+  kinsenusedcars-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: kinsenusedcars-app
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@kinsenusedcars-db:5432/${POSTGRES_DB}?schema=public
+      UPLOAD_DRIVER: local
+      UPLOAD_DIR: /app/public/uploads
+
+    ports:
+      - "127.0.0.1:3010:3000"
+
+    volumes:
+      - kinsenusedcars_uploads:/app/public/uploads
+
+    depends_on:
+      kinsenusedcars-db:
+        condition: service_healthy
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:3000').then(r => { if (!r.ok && r.status >= 500) process.exit(1) }).catch(() => process.exit(1))\""
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+    networks:
+      - kinsenusedcars-network
+      - proxy
+
+
+volumes:
+  kinsenusedcars_postgres_data:
+    name: kinsenusedcars_postgres_data
+
+  kinsenusedcars_uploads:
+    name: kinsenusedcars_uploads
+
+
+networks:
+  kinsenusedcars-network:
+    name: kinsenusedcars-network
+    driver: bridge
+
+  proxy:
+    external: true

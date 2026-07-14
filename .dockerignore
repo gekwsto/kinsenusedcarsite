@@ -1,0 +1,16 @@
+.git
+.gitignore
+.next
+node_modules
+npm-debug.log*
+.env
+.env.*
+!.env.example
+Dockerfile*
+docker-compose*.yml
+README.md
+reports
+.claude
+.DS_Store
+public/uploads/*
+!public/uploads/.gitkeep
