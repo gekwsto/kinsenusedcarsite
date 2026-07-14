@@ -3,8 +3,10 @@
 import * as React from "react";
 import { CalendarDays, Gauge, ShieldCheck, CheckCircle2, ArrowRight } from "lucide-react";
 import { FavoriteButton } from "@/components/vehicles/favorite-button";
+import { VehicleCompareToggle } from "@/components/vehicles/vehicle-compare-toggle";
 import { InterestModalTrigger } from "@/components/vehicles/interest-modal";
 import { cn, formatEuro, formatKm } from "@/lib/utils";
+import type { VehicleComparisonSummary } from "@/lib/vehicle-comparison";
 
 type PricingTab = "LEASING" | "PURCHASE";
 
@@ -13,11 +15,17 @@ const CTA_CLASSNAME =
 
 interface VehiclePricingSectionProps {
   vehicleId: string;
+  vehicleSlug: string;
   vehicleLabel: string;
+  maker: string;
+  versionName: string;
   yearRelease: number | null;
   km: number | null;
   monthlyPrice: number | null;
   price: number | null;
+  fuel: string | null;
+  transmissionType: string | null;
+  imageUrl: string | null;
 }
 
 // Leasing/Αγορά is a real tab now, not decoration: exactly one price card,
@@ -27,15 +35,35 @@ interface VehiclePricingSectionProps {
 // price panel on the right must share that same state.
 export function VehiclePricingSection({
   vehicleId,
+  vehicleSlug,
   vehicleLabel,
+  maker,
+  versionName,
   yearRelease,
   km,
   monthlyPrice,
   price,
+  fuel,
+  transmissionType,
+  imageUrl,
 }: VehiclePricingSectionProps) {
   const hasLeasing = monthlyPrice !== null;
   const hasPurchase = price !== null;
   const [activeTab, setActiveTab] = React.useState<PricingTab>(hasLeasing ? "LEASING" : "PURCHASE");
+
+  const comparisonSummary: VehicleComparisonSummary = {
+    id: vehicleId,
+    slug: vehicleSlug,
+    maker,
+    versionName,
+    yearRelease,
+    price,
+    monthlyPrice,
+    km,
+    imageUrl,
+    fuel,
+    transmissionType,
+  };
 
   const showLeasing = activeTab === "LEASING" && hasLeasing;
   const showPurchase = activeTab === "PURCHASE" && hasPurchase;
@@ -79,7 +107,10 @@ export function VehiclePricingSection({
 
         <div className="mb-3 flex items-start justify-between gap-3">
           <h1 className="text-2xl font-extrabold leading-tight text-detail-title sm:text-3xl">{vehicleLabel}</h1>
-          <FavoriteButton vehicleId={vehicleId} />
+          <div className="flex shrink-0 items-center gap-2">
+            <VehicleCompareToggle vehicle={comparisonSummary} showLabel />
+            <FavoriteButton vehicleId={vehicleId} />
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-3 text-sm font-bold text-[#7b8794]">

@@ -202,6 +202,25 @@ export async function getFeaturedVehicles(limit = 6) {
   return items.map(serializeVehicle);
 }
 
+/**
+ * Batch lookup for the vehicle-comparison feature — one query for up to
+ * MAX_COMPARISON_VEHICLES IDs, using the exact same PUBLIC_WHERE visibility
+ * filter as every other public read (a frozen/deleted vehicle ID never
+ * resolves here, so it can never leak into a shared /compare URL or a
+ * stale localStorage-persisted ID). Callers are responsible for
+ * re-ordering the result to match the caller's requested ID order (see
+ * reorderVehiclesByIds in src/lib/vehicle-comparison.ts) — Prisma's `in`
+ * filter does not preserve input order.
+ */
+export async function getPublicVehiclesByIds(ids: string[]) {
+  if (ids.length === 0) return [];
+  const items = await prisma.vehicle.findMany({
+    where: { id: { in: ids }, ...PUBLIC_WHERE },
+    include: { images: { orderBy: { sortOrder: "asc" } } },
+  });
+  return items.map(serializeVehicle);
+}
+
 export async function getPublicFilterOptions() {
   const [makers, colors, types, fuels, transmissions, offerCount] = await Promise.all([
     prisma.vehicle.findMany({ where: PUBLIC_WHERE, select: { maker: true }, distinct: ["maker"] }),

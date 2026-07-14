@@ -38,7 +38,15 @@ const PANEL_EASE = [0.22, 1, 0.36, 1] as const;
 // scratch. A single `activeModal` value makes "more than one open" a type
 // error, not just a UX mistake.
 interface InterestModalContextValue {
-  open: (type: InterestType) => void;
+  /**
+   * `trigger` should be the exact element the caller's click handler fired
+   * on (`event.currentTarget`), not inferred from `document.activeElement`
+   * inside the handler — see CookieConsentProvider's `lastTriggerRef` for
+   * the proven cross-browser reason (WebKit's `.click()` blurs an
+   * already-focused button before the click handler runs, so
+   * `document.activeElement` is unreliable there specifically).
+   */
+  open: (type: InterestType, trigger?: HTMLElement | null) => void;
 }
 
 const InterestModalContext = React.createContext<InterestModalContextValue | null>(null);
@@ -75,8 +83,8 @@ export function InterestModalProvider({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
-  const open = React.useCallback((type: InterestType) => {
-    lastTriggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const open = React.useCallback((type: InterestType, trigger?: HTMLElement | null) => {
+    lastTriggerRef.current = trigger ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
     pathnameAtOpenRef.current = window.location.pathname;
     setActiveModal(type);
   }, []);
@@ -347,7 +355,7 @@ export const InterestModalTrigger = React.forwardRef<HTMLButtonElement, Interest
         className={cn(className)}
         onClick={(event: React.MouseEvent<HTMLButtonElement>) => {
           onClick?.(event);
-          if (!event.defaultPrevented) open(interestType);
+          if (!event.defaultPrevented) open(interestType, event.currentTarget);
         }}
         {...props}
       />

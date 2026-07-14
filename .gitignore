@@ -14,3 +14,10 @@ npm-debug.log*
 dev-server.log
 .claude/
 .env.example
+
+# Playwright E2E — transient run output only. Visual-baseline snapshots
+# under tests/e2e/*-snapshots/ are intentionally NOT ignored (committed
+# baselines are the point of toHaveScreenshot()).
+playwright-report/
+test-results/
+blob-report/

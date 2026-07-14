@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* --font-sans is set by next/font/google (Manrope) via a className variable on <html> in layout.tsx */
+/* --font-sans is set by next/font/local (Manrope, self-hosted from src/assets/fonts/manrope/) via a className variable on <html> in layout.tsx */
 
 :root {
   /* Sticky site header height (4rem, see src/components/layout/header.tsx's
@@ -96,6 +96,32 @@ body::-webkit-scrollbar-thumb:hover {
 
 @media (prefers-reduced-motion: reduce) {
   .kinsen-active-filters-box {
+    animation: none;
+  }
+}
+
+/* Entrance transition for the cookie-consent banner
+   (src/components/cookie-consent/cookie-banner.tsx). Same rationale as
+   .kinsen-active-filters-box above: mounts once (resolved && no valid
+   consent yet), so only an entrance is defined — dismissal (accept/reject)
+   unmounts instantly. */
+@keyframes kinsen-cookie-banner-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.kinsen-cookie-banner {
+  animation: kinsen-cookie-banner-in 220ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kinsen-cookie-banner {
     animation: none;
   }
 }

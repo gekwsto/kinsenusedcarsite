@@ -1,13 +1,20 @@
 import type { Metadata } from "next";
-import { Manrope } from "next/font/google";
+import localFont from "next/font/local";
 import { Providers } from "@/app/providers";
 import "./globals.css";
 
-const manrope = Manrope({
-  subsets: ["latin", "greek"],
-  weight: ["300", "400", "500", "600", "700"],
+// Official Marketing-supplied font package (see src/assets/fonts/manrope/README.txt
+// and OFL.txt for provenance/license) — a first-party, self-hosted variable
+// font, never fetched from Google Fonts or any external CDN. The variable
+// font's own wght axis (200–800) covers every weight this app actually
+// uses (300/400/500/600/700), same as the previous next/font/google config.
+const manrope = localFont({
+  src: "../assets/fonts/manrope/Manrope-VariableFont_wght.ttf",
   variable: "--font-sans",
   display: "swap",
+  weight: "200 800",
+  style: "normal",
+  fallback: ["Arial", "Helvetica", "sans-serif"],
 });
 
 export const metadata: Metadata = {

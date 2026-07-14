@@ -1,0 +1,137 @@
+{
+  "report_status": "COMPLETE",
+  "timestamp": "2026-07-13T00:00:00Z",
+  "scope": "Architectural hardening of the cookie-consent system to eliminate phantom consent (Accept All previously stored preferences=analytics=marketing=true unconditionally, even though zero optional integrations exist). Introduces a centralized, typed Consent Integration Registry as the single source of truth for which optional categories exist, are enabled, appear in the modal, and may be granted.",
+  "supersedes_or_extends": "reports/cookie_consent_audit.json (that report's inventory findings — no analytics/marketing/preferences integration exists — are unchanged and remain the factual basis for this hardening).",
+
+  "phantom_consent_bug": {
+    "before": "createAcceptAllState() in src/lib/cookie-consent.ts unconditionally set preferences=true, analytics=true, marketing=true regardless of whether any real integration existed for those categories.",
+    "risk": "A user's stored 'Accept All' consent could later be read by a newly-added analytics/marketing integration as genuine opt-in, without ever having been presented with that integration or a fresh choice.",
+    "fix": "Accept All now calls createAcceptAllConsent(activeCategories, policyFingerprint), which sets an optional flag to true only if that category is present in activeCategories — itself derived from getActiveOptionalCategories(getEnabledConsentIntegrations(CONSENT_INTEGRATIONS)). With today's empty registry, activeCategories = [], so Accept All produces the same all-optional-false result as Reject."
+  },
+
+  "registry": {
+    "file": "src/lib/consent-integrations.ts",
+    "type_definition": "ConsentIntegrationDefinition { id, category: OptionalConsentCategory, enabled, provider, displayName, description, consentRevision, cookies: readonly ConsentCookieDefinition[], requiresReloadOnRevoke }",
+    "production_entries": [],
+    "enabled_integrations": [],
+    "active_optional_categories": [],
+    "active_category_derivation": "getActiveOptionalCategories(enabledIntegrations) — filters ALL_OPTIONAL_CATEGORIES (a fixed canonical ['preferences','analytics','marketing'] order) down to categories with >=1 enabled integration; pure, order-independent, no phantom categories.",
+    "no_fake_enabled_integration_added": true
+  },
+
+  "consent_policy_fingerprint": {
+    "format": "sorted `${id}:${category}:v${consentRevision}` joined by '|'; `necessary-only:v${NECESSARY_ONLY_POLICY_REVISION}` when no integration is enabled",
+    "current_value": "necessary-only:v1",
+    "order_independent": true,
+    "changes_on": ["integration enabled", "integration disabled→removed from set", "category changed", "consentRevision bumped"],
+    "does_not_change_on": ["provider/displayName/description edits (display-copy only)", "a disabled integration's fields changing", "registry array declaration order"]
+  },
+
+  "cookie": {
+    "current_name": "kinsen_cookie_consent_v2",
+    "current_version": 2,
+    "max_age_days": 180,
+    "attributes": "Path=/; SameSite=Lax; Secure (production/https only)",
+    "legacy_cookie_policy": "Option B — new cookie name (kinsen_cookie_consent_v2) rather than reusing kinsen_cookie_consent_v1. On mount, the client provider actively deletes any cookie named in LEGACY_COOKIE_CONSENT_NAMES (currently ['kinsen_cookie_consent_v1']) and never reads its flags — old phantom-true values are never imported into the new schema.",
+    "parser_rejects": [
+      "malformed JSON",
+      "missing/non-string/empty policyFingerprint",
+      "policyFingerprint !== current computed fingerprint",
+      "version !== COOKIE_CONSENT_VERSION",
+      "necessary !== true",
+      "non-boolean preferences/analytics/marketing",
+      "missing/non-string updatedAt"
+    ],
+    "parser_normalizes": "Even a structurally-valid, current-fingerprint payload has normalizeConsentAgainstActiveCategories applied before being trusted — an optional flag can never end up true for a category that isn't currently active, defense-in-depth against a manipulated cookie value."
+  },
+
+  "accept_all_behavior": {
+    "with_current_empty_registry": { "necessary": true, "preferences": false, "analytics": false, "marketing": false },
+    "with_mocked_analytics_only": { "necessary": true, "preferences": false, "analytics": true, "marketing": false },
+    "with_mocked_preferences_and_marketing": { "necessary": true, "preferences": true, "analytics": false, "marketing": true }
+  },
+  "reject_behavior": {
+    "always": { "necessary": true, "preferences": false, "analytics": false, "marketing": false },
+    "independent_of_registry": true
+  },
+  "custom_preferences_behavior": "createCustomState(selection, activeCategories, policyFingerprint) runs the selection through normalizeConsentAgainstActiveCategories before persisting — a category the modal never should have shown (or a tampered client-side value) cannot be saved as true.",
+
+  "modal": {
+    "necessary_category": "Always rendered — 'Πάντα ενεργά', no switch, real inventory (authjs.session-token, authjs.csrf-token, kinsen_cookie_consent_v2).",
+    "optional_categories_rendered": "getConsentCategoryViewModels(CONSENT_INTEGRATIONS) — today returns [], so zero optional accordion rows render.",
+    "empty_state_message": "Αυτή τη στιγμή ο ιστότοπος χρησιμοποιεί μόνο αναγκαία cookies.",
+    "no_fake_rows": true
+  },
+
+  "script_gate": {
+    "file": "src/components/cookie-consent/consent-script-gate.tsx",
+    "decision_logic": "ENABLED_CONSENT_INTEGRATIONS.filter(integration => hasConsent(integration.category)).map(...) → resolve each id in a plain client-side loader map, render if found.",
+    "current_output": "renders nothing (ENABLED_CONSENT_INTEGRATIONS = [])",
+    "loader_map_separation": "INTEGRATION_LOADERS: Record<string, React.ComponentType> lives in consent-script-gate.tsx, kept deliberately separate from the plain/serializable registry metadata in consent-integrations.ts."
+  },
+
+  "revocation": {
+    "source_of_truth": "src/lib/consent-integrations.ts — getRemovableCookiesForCategory(category) and categoryRequiresReloadOnRevoke(category), both derived from enabled integrations' own `cookies`/`requiresReloadOnRevoke` fields. The old hand-maintained REMOVABLE_COOKIES_BY_CATEGORY/RELOAD_REQUIRED_ON_REVOKE constants in the provider were removed.",
+    "today": "no removable cookies for any category, no reload required for any category (empty registry)."
+  },
+
+  "static_tracker_guard": {
+    "file": "src/server/services/__tests__/consent-tracker-guard.test.ts",
+    "patterns_checked": ["googletagmanager.com", "gtag(", "clarity(", "hotjar", "fbq(", "connect.facebook.net", "MetaPixel", "next/script import"],
+    "allowlisted_files": [
+      "src/lib/consent-integrations.ts",
+      "src/components/cookie-consent/consent-script-gate.tsx",
+      "src/server/services/__tests__/consent-tracker-guard.test.ts"
+    ],
+    "result": "PASS — no tracker/script literal found outside the allowlist"
+  },
+
+  "tests": {
+    "framework": "node:test (existing runner, no new framework added)",
+    "consent_test_files": [
+      "src/server/services/__tests__/cookie-consent.test.ts",
+      "src/server/services/__tests__/consent-tracker-guard.test.ts"
+    ],
+    "consent_tests_pass": "48/48",
+    "full_suite_pass": "197/197"
+  },
+
+  "validation": {
+    "typecheck": "clean",
+    "lint": "clean (2 pre-existing warnings in unrelated files, not introduced by this task)",
+    "build": "succeeds, /privacy-policy still a registered route",
+    "git_diff_check": "clean",
+    "package_json_changed": false,
+    "package_lock_changed": false,
+    "dependency_added": false,
+    "prisma_migration_added": false,
+    "tracker_added": false
+  },
+
+  "regression_checks_performed_via_ssr_html": {
+    "privacy_policy_sections_1_to_9": "present (9 h2 headings)",
+    "privacy_policy_subsections_3_1_3_2": "present (2 h3 headings)",
+    "privacy_policy_tables": "2 tables, 12 <tr> total (5 body rows + 1 header row each)",
+    "privacy_policy_email_link": "mailto:info@kinsen.gr present",
+    "privacy_policy_dpa_link": "https://www.dpa.gr present",
+    "privacy_policy_last_updated_date": "22.02.2022 present, unchanged",
+    "footer_privacy_link": "present, href=/privacy-policy",
+    "footer_cookie_settings_button": "present, real <button>",
+    "global_font_manrope_variable_class": "present on <html>",
+    "cookie_banner_absent_from_ssr": "confirmed (hydration-safe, unresolved-until-client-effect)",
+    "no_server_set_cookie_header": "confirmed on /vehicles",
+    "no_tracker_literal_in_compiled_static_output": "confirmed via grep of .next/static",
+    "new_fingerprint_logic_present_in_client_bundle": "confirmed (grep for 'necessary-only' in .next/static/chunks)"
+  },
+
+  "manual_browser_verification": {
+    "browser_automation_available": false,
+    "note": "No Playwright/Chrome DevTools tool is available in this environment. All checks above were performed via curl against an isolated production server (port 3099, never the developer's own running dev server) plus static inspection of compiled output. Full first-visit/accept/reject/legacy-cookie-injection/responsive/zoom click-through testing in a real browser was not literally performed and should be done manually before merging."
+  },
+
+  "limitations": [
+    "No browser automation tool available — see manual_browser_verification above.",
+    "Registry and script-gate architecture is verified structurally and via pure unit tests; there is no integration/E2E test exercising the actual React component tree (no RTL/Playwright in this repo, and none was added per task constraints)."
+  ]
+}

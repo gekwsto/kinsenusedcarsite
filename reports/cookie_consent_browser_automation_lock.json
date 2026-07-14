@@ -1,0 +1,384 @@
+{
+  "report_status": "COMPLETE — WebKit root-cause investigation and fix applied, all 3 browser projects fully green",
+  "timestamp": "2026-07-13T00:00:00Z",
+  "webkit_investigation_updated": "2026-07-13T00:00:00Z",
+  "scope": "Real browser automation (Playwright) added to prove the cookie-consent/privacy-policy work end-to-end in an actual browser, superseding the earlier curl/static-inspection-only verification.",
+  "framework": {
+    "existing_e2e_framework_found": false,
+    "chosen": "@playwright/test",
+    "version": "1.61.1",
+    "dependency_added_as": "devDependency",
+    "installed_via": "npm install --save-dev @playwright/test (package-lock.json updated by npm itself, never hand-edited)",
+    "config_path": "playwright.config.ts",
+    "test_files": [
+      "tests/e2e/helpers.ts",
+      "tests/e2e/cookie-consent.spec.ts",
+      "tests/e2e/privacy-policy.spec.ts",
+      "tests/e2e/responsive-consent.spec.ts",
+      "tests/e2e/public-regression.spec.ts",
+      "tests/e2e/visual-consent.spec.ts"
+    ],
+    "npm_scripts_added": [
+      "test:e2e",
+      "test:e2e:headed",
+      "test:e2e:report"
+    ]
+  },
+  "browser_installation": {
+    "chromium": {
+      "source": "bundled/pre-cached at ~/Library/Caches/ms-playwright/chromium-1228",
+      "launch_verified": true,
+      "method": "npx playwright install chromium (already present, instant no-op) + direct smoke-test launch"
+    },
+    "firefox": {
+      "installed_via": "npx playwright install firefox",
+      "version": "151.0 (playwright build 1532)",
+      "download_size_mb": 98.8,
+      "launch_verified": true
+    },
+    "webkit": {
+      "installed_via": "npx playwright install webkit",
+      "version": "26.5 (playwright build 2311)",
+      "download_size_mb": 77.2,
+      "launch_verified": true
+    },
+    "os": "Darwin 25.5.0 (macOS, arm64)",
+    "no_system_package_install_required": true
+  },
+  "server": {
+    "mode": "production (npm run build && npm run start)",
+    "isolated_port": 3099,
+    "bind_host": "127.0.0.1",
+    "base_url": "http://127.0.0.1:3099",
+    "webserver_lifecycle": "started and stopped automatically by Playwright's `webServer` config per run; never reused or conflicting with the developer's own :3001 dev server",
+    "auth_trust_host_override": "AUTH_TRUST_HOST=true set only for this spawned server process (see real_bugs_found below) — not a change to .env or auth.ts"
+  },
+  "test_run_results": {
+    "chromium": {
+      "total": 86,
+      "passed": 86,
+      "failed": 0,
+      "skipped": 0,
+      "status": "FULLY GREEN — full project, verified on 2 separate consecutive full runs"
+    },
+    "firefox": {
+      "total": 86,
+      "passed": 86,
+      "failed": 0,
+      "skipped": 0,
+      "status": "FULLY GREEN — full project, verified on multiple full runs after fixing a pre-existing test-harness timing/allowlist gap (see safari_webkit_diagnosis.related_non_webkit_fixes)"
+    },
+    "webkit": {
+      "total": 86,
+      "passed": 86,
+      "failed": 0,
+      "skipped": 0,
+      "status": "FULLY GREEN — full project, verified on 2 separate consecutive full runs after real root-cause investigation and fixes (see safari_webkit_diagnosis below). The original 3-failure 'Safari/WebKit button focus behavior' classification from an earlier pass was NOT accepted at face value; it was reproduced, isolated, and proven wrong for 2 of the 3 failures."
+    },
+    "default_unit_tests": {
+      "command": "npm test",
+      "total": 197,
+      "passed": 197,
+      "failed": 0
+    },
+    "consent_specific_unit_tests": {
+      "total": 48,
+      "passed": 48,
+      "failed": 0
+    },
+    "npm_run_test_e2e_default_script": {
+      "command": "npm run test:e2e",
+      "note": "Equivalent to `playwright test` with no --project filter. playwright.config.ts only registers the firefox/webkit projects when PLAYWRIGHT_FIREFOX=1 / PLAYWRIGHT_WEBKIT=1 are set, so this default invocation runs chromium only (86/86). This is a pre-existing config gate, not something narrowed to fake a green run — firefox and webkit were run and verified separately and explicitly, both fully green, as documented in this report.",
+      "result": "86/86 passed, exit code 0, verified twice"
+    }
+  },
+  "safari_webkit_diagnosis": {
+    "instruction": "A prior pass had classified 3 WebKit test failures as generic 'Safari/WebKit button focus behavior' without reproducing or proving it. This investigation did not accept that classification and instead reproduced each failure with --trace=on, built an isolated React/Radix/Tailwind-free plain-HTML control page to test native Tab order, pointer-click focus, programmatic focus, and keyboard activation across all 3 engines, and used that evidence to classify each failure individually.",
+    "original_3_failing_tests": [
+      "[10][11][27] Escape closes the modal without saving, and focus returns to the banner's settings button (cookie-consent.spec.ts:176) — assertion that failed: `expect(banner.settingsButton).toBeFocused()` after Escape",
+      "[12][13][26] footer settings opens the modal after consent is resolved, shows necessary-only, and returns focus on close (cookie-consent.spec.ts:204) — assertion that failed: `expect(settingsButton).toBeFocused()` after Escape",
+      "Tab reaches every banner action in order, each with visible focus (cookie-consent.spec.ts:449) — assertion that failed: `expect(banner.settingsButton).toBeFocused()` after a single Tab press from the reject button"
+    ],
+    "control_experiment": {
+      "method": "Minimal plain HTML page (no React, no Radix, no Tailwind, no app CSS) with a link, a plain <button>, an <input>, a tabindex=0 button, and a tabindex=-1 button, run identically in Chromium/Firefox/WebKit via a standalone Playwright script (outside the app, in scratch space).",
+      "sequential_tab_order_from_blurred_state": {
+        "chromium": [
+          "link1",
+          "btn1",
+          "input1",
+          "btn2"
+        ],
+        "firefox": [
+          "link1",
+          "btn1",
+          "input1",
+          "btn2"
+        ],
+        "webkit": [
+          "input1",
+          "btn2"
+        ]
+      },
+      "pointer_click_focuses_plain_button": {
+        "chromium": true,
+        "firefox": true,
+        "webkit": false
+      },
+      "programmatic_focus_of_plain_button": {
+        "chromium": "works",
+        "firefox": "works",
+        "webkit": "works"
+      },
+      "keyboard_enter_space_activation_after_programmatic_focus": {
+        "chromium": "works",
+        "firefox": "works",
+        "webkit": "works"
+      },
+      "decisive_experiment_focus_then_click_same_element": {
+        "description": "Reproduces the app's exact real sequence: .focus() immediately followed by .click() on the same <button>.",
+        "chromium": {
+          "active_element_after_focus": "btn1",
+          "active_element_after_click": "btn1"
+        },
+        "firefox": {
+          "active_element_after_focus": "btn1",
+          "active_element_after_click": "btn1"
+        },
+        "webkit": {
+          "active_element_after_focus": "btn1",
+          "active_element_after_click": ""
+        },
+        "finding": "WebKit's native .click() blurs an already-.focus()-ed plain <button> before any click handler runs; Chromium/Firefox keep it focused through the click. This is proven, genuine, native WebKit engine behavior — reproduced with zero application code involved — and matches real Safari's documented default ('Full Keyboard Access: Text boxes and lists only') where plain buttons are excluded from keyboard/focus handling unless the user opts in."
+      }
+    },
+    "per_failure_root_cause_classification": [
+      {
+        "test": "Escape closes the modal ... focus returns to the banner's settings button",
+        "classification": "Case A — real, fixable application defect (NOT genuine WebKit-only behavior, despite superficially correlating with the WebKit focus quirk above)",
+        "reasoning": "CookieConsentProvider's openPreferences() captured the modal's 'opener' by reading `document.activeElement` from inside the click handler. That is unreliable specifically in WebKit because of the proven .focus()+.click() blur behavior above: by the time the click handler ran, document.activeElement was already <body>, so lastTriggerRef was set to null (or the wrong element), and Radix's onCloseAutoFocus had nothing correct to focus() back to after Escape.",
+        "production_fix": "openPreferences(trigger?: HTMLElement | null) now accepts the exact clicked element explicitly. Both call sites (the banner's own settings button and the footer's settings button) now pass `event.currentTarget` — which is always the exact element the handler is bound to, in all 3 engines, regardless of how each engine manages focus/blur around the click. lastTriggerRef is populated from this explicit argument, falling back to document.activeElement only when no trigger is supplied (e.g. a future non-pointer caller).",
+        "files_changed": [
+          "src/components/providers/cookie-consent-provider.tsx",
+          "src/components/cookie-consent/cookie-banner.tsx",
+          "src/components/layout/cookie-settings-button.tsx"
+        ],
+        "verification": "Instrumented the real app (temporary console logging, since removed) confirming: before the fix, no focus event fired after Escape in WebKit (activeElement stayed <body>); after the fix + a fresh production rebuild, the banner's settings button correctly receives focus again after Escape. Also confirmed the very first WebKit re-run after only the source edit (no rebuild) still failed — proving Playwright's `webServer` reuses an existing `next start` process rather than rebuilding, which was the actual reason the fix appeared not to work on the first verification attempt. This was a test-workflow pitfall, not a defect in the fix itself; resolved by explicitly rebuilding before every re-run."
+      },
+      {
+        "test": "footer settings opens the modal ... returns focus on close",
+        "classification": "Case A — same root cause and same fix as the previous test (footer button variant)",
+        "reasoning": "Identical bug: src/components/layout/cookie-settings-button.tsx passed `openPreferences` directly as the onClick handler, which — once openPreferences's signature changed to accept a trigger argument — also needed to explicitly pass `event.currentTarget` rather than rely on document.activeElement.",
+        "production_fix": "Same as above.",
+        "files_changed": [
+          "src/components/layout/cookie-settings-button.tsx"
+        ],
+        "verification": "Passes in isolation and in the full WebKit project after the fix."
+      },
+      {
+        "test": "Tab reaches every banner action in order, each with visible focus",
+        "classification": "Case C — genuine native WebKit/Safari platform behavior, proven with zero application code involved (see control_experiment above)",
+        "reasoning": "WebKit does not include plain <button> elements in sequential Tab order by default (matches real Safari's default Full Keyboard Access setting). This is not caused by this app's CSS, Tailwind, Radix, or any outline/tabindex/preventDefault suppression — the identical omission was reproduced on an unstyled, React-free HTML page with a bare <button>.",
+        "test_fix": "The test now branches on `browserName`. Chromium/Firefox keep the exact original assertion (literal sequential Tab arrival on reject → settings → accept-all, unchanged). For WebKit, sequential Tab arrival is not asserted (since real Safari itself does not guarantee it here by default); instead the test asserts the settings and accept-all buttons are real semantic <button> elements (not divs — real Full-Keyboard-Access Safari users and switch/assistive-tech devices could not otherwise reach them at all), that the settings button is explicitly focusable via .focus(), and that it is Enter-activatable and correctly opens/closes the modal — proving the exact way a Safari user with Full Keyboard Access enabled (or any AT that drives focus programmatically, which is the common real-world case) actually operates this banner.",
+        "files_changed": [
+          "tests/e2e/cookie-consent.spec.ts"
+        ],
+        "skips_or_fixmes_used": "None. No assertion was skipped or marked fixme — the WebKit branch is a full, narrowly-scoped alternate assertion, not an omission.",
+        "coverage_preserved": "Sequential sighted-keyboard Tab order is WebKit's one proven, unfixable native divergence and is not asserted for WebKit specifically; every other behavior in the 25-item consent behavior list (banner appearance, Accept All, Reject, cookie correctness, persistence, settings from both openers, Escape, focus-trap, focus-return, close button, legacy/malformed cookie rejection, no tracker requests, responsive layout, privacy page, navigation, no console/page errors) remains fully automated and passing in WebKit, unchanged."
+      }
+    ],
+    "related_non_webkit_fixes_found_during_this_investigation": [
+      {
+        "bug": "The exact same Case-A trigger-capture defect (reading document.activeElement inside a click handler instead of using event.currentTarget) also existed in the unrelated vehicle-detail 'interest/inquiry' modal (InterestModalProvider.open), causing its own focus-restoration-after-Escape test to fail in WebKit for the identical proven reason.",
+        "production_fix": "InterestModalProvider.open(type, trigger?) now accepts an explicit trigger element; InterestModalTrigger's onClick passes event.currentTarget.",
+        "files_changed": [
+          "src/components/vehicles/interest-modal.tsx"
+        ]
+      },
+      {
+        "bug": "Firefox (and intermittently WebKit) benignly log a console.error reading 'Fetch API cannot load <url>?_rsc=... due to access control checks' when an in-flight Next.js <Link> background prefetch is cancelled by an unrelated same-test page navigation (e.g. page.goBack()) — a documented, misleading browser wording for a harmless cancelled fetch, not a real access-control/CORS failure. The existing test-harness allowlist already excused Chromium's differently-worded net::ERR_ABORTED for the identical phenomenon but did not cover this browser's wording, and the message text itself is additionally racy in Firefox (sometimes the bare word 'Error' instead of the full sentence, when the page's JS context is torn down before Playwright reads the console args) — too unstable a string to pattern-match reliably.",
+        "test_fix": "Two changes: (1) added one narrowly-scoped console-error allowlist pattern (matching only `_rsc=` prefetch URLs, mirroring the existing Chromium/next-auth entries) for the cases where the full message text is captured; (2) fixed the actual timing race at its source in tests/e2e/public-regression.spec.ts by awaiting `page.waitForLoadState('networkidle')` before the `page.goBack()` call, so the page's own background prefetches settle before the navigation that would otherwise cancel them mid-flight.",
+        "files_changed": [
+          "tests/e2e/helpers.ts",
+          "tests/e2e/public-regression.spec.ts"
+        ],
+        "verification": "Confirmed via 3 consecutive isolated re-runs and 2 full-project re-runs each for Firefox and WebKit with no recurrence."
+      }
+    ],
+    "playwright_webkit_vs_real_safari_statement": "This suite exercises Playwright's bundled WebKit engine (build 2311), which shares Safari's underlying rendering/focus engine and reproduces the same native button-focus/Tab-order behavior documented above. It is NOT the same as running the actual shipping Safari browser application (with its full native chrome, extensions, OS-level accessibility settings, and Apple's own build) — it is not 'Safari fully certified'. The specific behavior this suite now encodes (plain buttons excluded from default Tab order; buttons remain reachable and operable via explicit focus and keyboard activation) is the same behavior documented for real Safari's default configuration, and the app was verified to remain fully keyboard-operable under that configuration in all cases that matter (focus-trap, focus-restoration, Escape, keyboard activation) — but only real Safari testing, not Playwright WebKit coverage, could exercise a real user's actual Full Keyboard Access toggle, VoiceOver, or Apple's own build-specific quirks.",
+    "final_webkit_project_result": {
+      "total": 86,
+      "passed": 86,
+      "failed": 0,
+      "skipped": 0,
+      "verified_on": "2 separate consecutive full-project runs"
+    },
+    "final_default_e2e_exit_code": 0,
+    "screenshots_and_traces_inspected": [
+      "test-results/.../trace.zip for all 3 originally-failing tests, captured with --trace=on before and after the fix",
+      "Instrumented focus/blur event log and document.activeElement snapshots captured directly from a live WebKit page against the real app (banner button focus → blur-on-click → modal close-button auto-focus → restored focus on the banner button after the fix)"
+    ]
+  },
+  "real_bugs_found_and_fixed_via_browser_testing": [
+    {
+      "bug": "NextAuth v5 rejected every session-fetch as 'UntrustedHost' when the app ran on the isolated E2E port (.env's NEXTAUTH_URL is pinned to the dev server's localhost:3000). This 500 error cascaded into a visible transient double-render of the entire page (2x <header>, 2x <main>) during the hydration-mismatch-recovery cycle.",
+      "detection_method": "Only visible via real browser console/network inspection and DOM element counts immediately after page load — invisible to curl or unit tests.",
+      "fix": "playwright.config.ts webServer.env sets AUTH_TRUST_HOST=true for the spawned test-server process only (Auth.js's own documented variable for this exact scenario). No application code or .env changed.",
+      "files_changed": [
+        "playwright.config.ts"
+      ]
+    },
+    {
+      "bug": "Focus did not return to the banner's own 'Ρυθμίσεις cookies' button after closing the preferences modal (Escape) when it was the modal's opener — focus landed on <body> instead. Root cause: CookieBanner unmounted itself (`return null`) while the modal was open, destroying the exact DOM node CookieConsentProvider's lastTriggerRef pointed to.",
+      "detection_method": "Only visible via a real focus-return assertion after a real Escape keypress in a real browser — impossible to catch with static analysis.",
+      "fix": "CookieBanner now stays mounted while the modal is open (hidden via `invisible`, not unmounted) — Radix's modal Dialog already marks it aria-hidden and its own overlay already covers/blocks it visually and interactively.",
+      "files_changed": [
+        "src/components/cookie-consent/cookie-banner.tsx"
+      ]
+    },
+    {
+      "bug": "A stored consent cookie with phantom optional=true flags for an inactive category was correctly normalized to false in React state on load, but the corrected value was never written back to the actual browser cookie — only the in-memory state.",
+      "detection_method": "Real cookie-jar inspection (context.cookies()) after page load showed the raw persisted value still had the un-normalized `true` flags, despite the app behaving correctly in-memory.",
+      "fix": "CookieConsentProvider's mount effect now re-persists the normalized value back to document.cookie whenever a stored cookie is found (a harmless no-op when nothing needed correcting).",
+      "files_changed": [
+        "src/components/providers/cookie-consent-provider.tsx"
+      ]
+    },
+    {
+      "bug": "On desktop viewports, the preferences modal's sticky footer forced its three action buttons into a single row via a *viewport*-width breakpoint (`sm:flex-row`), but the modal itself is capped at `max-w-lg` regardless of viewport — the row did not fit, and the leftmost button ('Απόρριψη μη απαραίτητων') was silently cropped by the modal's own `overflow-hidden`.",
+      "detection_method": "Only visible in an actual rendered screenshot at desktop width — button role/name/visibility assertions did not catch the partial clipping.",
+      "fix": "Added `sm:flex-wrap` so buttons that don't fit in one row wrap to a second line instead of being cropped.",
+      "files_changed": [
+        "src/components/cookie-consent/cookie-preferences-modal.tsx"
+      ]
+    },
+    {
+      "bug": "Focus did not return to either the banner's or the footer's 'settings' button after closing the preferences modal via Escape, specifically and only in WebKit. Root cause (proven with an isolated plain-HTML control experiment, see safari_webkit_diagnosis): the opener-capture mechanism read document.activeElement inside the click handler, which WebKit's native .click()-blurs-an-already-focused-button behavior makes unreliable — by the time the handler ran, document.activeElement was already <body>.",
+      "detection_method": "Reproduced deterministically with --trace=on in real WebKit; root-caused with a React/Radix/Tailwind-free plain-HTML control page proving the exact focus()-then-click() sequence blurs only in WebKit, not Chromium/Firefox.",
+      "fix": "openPreferences()/InterestModalProvider.open() now accept an explicit trigger element, and both call sites pass event.currentTarget (reliable in all 3 engines) instead of relying on document.activeElement.",
+      "files_changed": [
+        "src/components/providers/cookie-consent-provider.tsx",
+        "src/components/cookie-consent/cookie-banner.tsx",
+        "src/components/layout/cookie-settings-button.tsx",
+        "src/components/vehicles/interest-modal.tsx"
+      ]
+    }
+  ],
+  "test_infrastructure_bugs_found_in_my_own_e2e_code_and_fixed": [
+    "Unscoped page-wide text/heading locators ambiguously matched both the modal and the identically-labeled footer/banner elements in several tests — fixed by scoping to the dialog/region locator.",
+    "Pagination test's unanchored regex /Επόμενη|2/ incidentally matched an unrelated vehicle card title containing '2023' — fixed with an exact-text, nav-scoped locator.",
+    "Scroll-lock test read window.scrollY immediately after scrollTo() without accounting for globals.css's `scroll-behavior: smooth` — fixed with `behavior: 'instant'`.",
+    "Full-page screenshot captures using Playwright's `animations: 'disabled'` option produced a washed-out/incorrect capture on this specific app (many simultaneously-animating siblings) — verified empirically against a plain control screenshot; replaced with a short justified wait for the known ~220ms CSS entrance transition. The smaller, locator-scoped `toHaveScreenshot()` baseline captures do not exhibit this issue and keep using `animations: 'disabled'` as intended.",
+    "A benign next-auth console.error ('Failed to fetch ... autherror') occurs when a real browser back-navigation aborts the library's own in-flight session fetch — added one narrow, documented console-error allowlist entry for this exact message.",
+    "The Tab-order test asserted literal sequential Tab arrival on plain <button> elements, which WebKit does not guarantee by default (proven genuine platform behavior, see safari_webkit_diagnosis) — replaced with a browserName-branched assertion: Chromium/Firefox keep the original sequential-Tab assertion unchanged; WebKit instead asserts semantic focusability, explicit programmatic focus, and real keyboard (Enter) activation of the same buttons.",
+    "Firefox (and intermittently WebKit) log a misleadingly-worded console.error for a harmless, expected cancelled <Link> background-prefetch fetch during an unrelated same-test page.goBack() — added one narrowly-scoped `_rsc=`-only allowlist pattern and fixed the underlying timing race by awaiting page.waitForLoadState('networkidle') before the navigation that triggers the cancellation, in tests/e2e/public-regression.spec.ts and tests/e2e/helpers.ts."
+  ],
+  "cookie_assertions_verified_against_the_real_browser_cookie_jar": {
+    "name": "kinsen_cookie_consent_v2",
+    "path": "/",
+    "sameSite": "Lax",
+    "secure_on_local_http": false,
+    "version": 2,
+    "policyFingerprint": "necessary-only:v1",
+    "necessary": true,
+    "preferences_analytics_marketing_after_accept_all_or_reject": false,
+    "updatedAt": "valid ISO timestamp (exact value not asserted)"
+  },
+  "legacy_and_malformed_cookie_results": {
+    "legacy_v1_cookie": "deleted from the real cookie jar; its phantom preferences=analytics=marketing=true flags were never imported; banner appeared; no tracker request occurred",
+    "malformed_v2_variants_tested": [
+      "invalid/truncated JSON",
+      "missing policyFingerprint",
+      "wrong policyFingerprint",
+      "wrong version",
+      "necessary=false"
+    ],
+    "malformed_result": "all rejected safely — no crash, no hydration error, banner appeared, no tracker request; a fresh Accept All replaced each with a valid normalized cookie",
+    "phantom_flags_with_valid_fingerprint": "accepted (not rejected) and silently normalized down to false in the persisted cookie — verified via real cookie-jar read, not just in-memory state"
+  },
+  "accessibility_results": {
+    "keyboard_chromium": "PASS — Tab order, focus-trap, Shift+Tab wrap (verified via 10-cycle containment check), Escape, focus-return-to-opener (both banner and footer openers) all verified in a real browser",
+    "keyboard_firefox": "PASS — full project green (86/86)",
+    "keyboard_webkit": "PASS — full project green (86/86) after root-causing and fixing 2 real focus-restoration application bugs and encoding 1 proven-genuine WebKit platform-behavior assertion; see safari_webkit_diagnosis for full detail",
+    "scroll_lock": "verified via real mouse-wheel scroll attempts while the modal is open (background does not move) and after close (scroll restored)",
+    "reduced_motion": "verified via a real BrowserContext with reducedMotion:'reduce' — banner/modal/accept-all flow fully functional"
+  },
+  "privacy_page_result": {
+    "sections_1_to_9": "present (verified via real DOM heading query, scoped to <article> to exclude the banner's own <h2>)",
+    "subsections_3_1_3_2": "present",
+    "tables": "exactly 2, each with exactly 5 <tbody> rows",
+    "email_link": "mailto:info@kinsen.gr present and visible",
+    "dpa_link": "https://www.dpa.gr present, target=_blank, rel includes noreferrer",
+    "last_updated_text": "'στις22.02.2022' present verbatim (including the source's own run-together typo)",
+    "mobile_390_overflow": "none"
+  },
+  "public_regression_results": {
+    "navigation": "homepage → /vehicles → /privacy-policy → Back all verified in a real browser; consent persisted throughout; no console/page errors",
+    "vehicle_listing_filters": "route loads (18 real seeded vehicles), filter accordion opens/closes (aria-expanded verified), sort dropdown opens, pagination page-2 link navigates correctly",
+    "favorites_anonymous": "clicking a favorite button as an anonymous visitor correctly redirects to /login?callbackUrl=... — real architecture confirmed, no JS error",
+    "login": "form fields accessible by label, submit button accessible, empty submission handled safely, consent persists across navigation to /login",
+    "inquiry_modal": "opens on a real vehicle detail page (toyota-corolla-2021), form fields accessible, Escape closes it, focus returns to opener, no stacking conflict with the cookie modal"
+  },
+  "screenshots": {
+    "artifact_directory": "test-results/artifacts/ (gitignored, transient)",
+    "files": [
+      "banner-390.png",
+      "modal-390.png",
+      "banner-1440.png",
+      "modal-1440.png",
+      "privacy-table-390.png",
+      "privacy-1440.png",
+      "vehicles-post-consent.png"
+    ],
+    "all_visually_inspected_by_agent": true,
+    "visual_baseline_snapshots": {
+      "directory": "tests/e2e/visual-consent.spec.ts-snapshots/",
+      "git_tracking_status": "NOT committed — the entire directory is currently untracked (`git status` shows `?? tests/e2e/visual-consent.spec.ts-snapshots/`) for all 3 browsers, not just webkit/firefox. This is a pre-existing gap from the original consent-work session (baselines were generated locally but never `git add`-ed), out of scope for this WebKit-focus investigation to fix — noted here for accuracy rather than repeating the earlier report's inaccurate 'committed' claim.",
+      "files": [
+        "banner-mobile/desktop",
+        "modal-mobile/desktop"
+      ],
+      "per_browser": [
+        "chromium-darwin",
+        "firefox-darwin",
+        "webkit-darwin"
+      ],
+      "all_visually_inspected_by_agent": true,
+      "result": "all correct after fixing the animation-capture-timing and button-clipping issues found during the original inspection",
+      "known_intermittent_flake": "tests/e2e/visual-consent.spec.ts 'banner — mobile' (Firefox only) intermittently fails a pixel-diff comparison against its own local baseline when run as part of the full project (not reproducible in isolation, not deterministic across repeated full runs — passed cleanly on 2 of 3 full-project attempts during this investigation). Consistent with system-load-sensitive font/subpixel rendering timing, a known category of visual-regression fragility. Not related to focus/consent logic, does not occur in WebKit, and was not introduced by any change in this investigation — left as a pre-existing, documented, non-blocking flake rather than papered over."
+    }
+  },
+  "validation": {
+    "npm_test": "197/197 pass",
+    "typecheck": "clean (tsc --noEmit, 0 errors)",
+    "lint": "clean (eslint ., 0 errors, 2 pre-existing warnings in unrelated files: register-form.tsx and interest-modal.tsx, both the same known react-hook-form watch() incompatible-library compiler warning, present before this investigation)",
+    "build": "succeeds (npm run build, exit 0)",
+    "git_diff_check": "clean (git diff --check, exit 0, no whitespace errors)",
+    "git_status": "clean working tree aside from the expected in-progress feature-branch changes (modified: .gitignore, package.json, package-lock.json, src/app/(public)/layout.tsx, src/app/globals.css, src/components/layout/footer.tsx, src/components/vehicles/interest-modal.tsx; untracked: the rest of the not-yet-committed cookie-consent feature and its tests) — no stray/unexpected files",
+    "package_json_changed": true,
+    "package_json_change": "test:e2e/test:e2e:headed/test:e2e:report scripts + @playwright/test devDependency — explicitly permitted by this task",
+    "package_lock_changed": true,
+    "package_lock_change": "generated by npm install only, never hand-edited",
+    "no_other_dependency_added": true,
+    "no_new_framework_or_dependency_added_in_this_webkit_investigation": true,
+    "no_prisma_migration_added": true,
+    "no_production_data_modified": true,
+    "no_tracker_introduced": true,
+    "privacy_policy_text_unchanged": true,
+    "consent_cookie_behavior_unchanged": true,
+    "no_modal_clipping_regression": true,
+    "no_focus_return_regression": "improved — 2 real focus-return bugs fixed, 0 known remaining"
+  },
+  "limitations": [
+    "The earlier report version's WebKit classification ('3 known failures — documented platform behavior') was superseded by this investigation: it was not accepted without proof, was reproduced and root-caused, and 2 of the 3 were in fact real, fixable application defects (now fixed) rather than platform behavior. Only 1 of the 3 (sequential Tab order landing on plain buttons) is genuine, proven WebKit/Safari platform behavior, and it is now covered by an accurate WebKit-specific assertion rather than being skipped. WebKit is fully green: 86/86.",
+    "Playwright's WebKit engine is not the same as the actual shipping Safari browser application — see safari_webkit_diagnosis.playwright_webkit_vs_real_safari_statement for the precise scope of what was and was not verified.",
+    "tests/e2e/visual-consent.spec.ts-snapshots/ is not committed to git for any of the 3 browsers (pre-existing gap, not introduced or fixed by this investigation — noted for accuracy, out of this investigation's scope).",
+    "One Firefox-only visual pixel-diff comparison ('banner — mobile') is intermittently flaky under full-project system load (not reproducible in isolation, not WebKit, not related to consent/focus logic) — documented above, not papered over.",
+    "One earlier isolated re-run of a single privacy-policy test failed transiently while the agent was rapidly cycling manual kill/restart probes against the dev server for diagnostic purposes (from an earlier work session); it was not reproducible in a clean, non-interfered full-suite run or in a fresh isolated reproduction attempt, and is attributed to that manual interference rather than a real defect."
+  ],
+  "cookie_preferences_english_content_investigation": {
+    "incident": "A report described the cookie preferences modal rendering generic English fallback/demo content.",
+    "result": "Not reproducible — full source grep, clean rebuild grep, and live rendered-DOM inspection all confirmed the modal renders exactly the correct, registry-driven, all-Greek necessary-only content. No production code change was made.",
+    "regression_guards_added": "Static source guard (src/server/services/__tests__/consent-ui-content-guard.test.ts), extra registry/view-model unit tests, and one new live-DOM Playwright assertion (tests/e2e/cookie-consent.spec.ts) — all passing in Chromium, Firefox and WebKit.",
+    "full_detail": "reports/cookie_preferences_dynamic_ui_lock.json"
+  }
+}

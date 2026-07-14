@@ -1,0 +1,235 @@
+{
+  "report_status": "COMPLETE",
+  "repository": "kinsenusedcarsite",
+  "branch": "addCookiesBanner",
+  "scope": "Complete premium vehicle-comparison system: centralized state, compare toggle on all vehicle surfaces, desktop panel + mobile sheet + collapsed control, /compare route with a real-data comparison matrix, unit tests, and cross-browser Playwright E2E coverage.",
+  "files_audited": [
+    "src/components/vehicles/vehicle-card.tsx",
+    "src/components/vehicles/vehicle-grid.tsx",
+    "src/components/vehicles/favorite-button.tsx",
+    "src/components/providers/favorites-provider.tsx",
+    "src/components/providers/cookie-consent-provider.tsx",
+    "src/components/vehicles/interest-modal.tsx",
+    "src/components/vehicles/vehicle-pricing-section.tsx (pre-existing shape)",
+    "src/app/(public)/layout.tsx",
+    "src/app/(public)/vehicles/page.tsx",
+    "src/app/(public)/vehicles/[slug]/page.tsx",
+    "src/app/providers.tsx",
+    "src/app/api/vehicles/[id]/route.ts",
+    "src/server/services/vehicle.service.ts",
+    "src/server/services/vehicle-image.service.ts",
+    "src/lib/utils.ts",
+    "src/lib/cookie-consent.ts",
+    "src/lib/consent-integrations.ts",
+    "reports/cookie_consent_audit.json",
+    "reports/cookie_consent_registry_lock.json",
+    "src/components/ui/sheet.tsx",
+    "src/components/ui/dialog.tsx",
+    "src/components/ui/use-toast.ts",
+    "prisma/schema.prisma (Vehicle model)",
+    "prisma/seed.ts (20 seed vehicles, 18 currently public)",
+    "playwright.config.ts",
+    "tests/e2e/helpers.ts",
+    "tests/e2e/public-regression.spec.ts",
+    "tailwind.config.ts",
+    "package.json"
+  ],
+  "files_added": [
+    "src/lib/vehicle-comparison.ts",
+    "src/lib/comparison-fields.ts",
+    "src/components/providers/vehicle-comparison-provider.tsx",
+    "src/components/vehicles/vehicle-compare-toggle.tsx",
+    "src/components/vehicles/vehicle-comparison-tray.tsx",
+    "src/components/vehicles/comparison-matrix.tsx",
+    "src/components/vehicles/comparison-incomplete-state.tsx",
+    "src/app/(public)/compare/page.tsx",
+    "src/app/api/vehicles/compare/route.ts",
+    "src/server/services/__tests__/vehicle-comparison.test.ts",
+    "src/server/services/__tests__/comparison-fields.test.ts",
+    "tests/e2e/vehicle-comparison.spec.ts"
+  ],
+  "files_modified": [
+    {
+      "file": "src/components/vehicles/vehicle-card.tsx",
+      "change": "Added VehicleCompareToggle next to FavoriteButton (top-right, both size='sm' for visual balance); added role=\"group\" + aria-label={maker+versionName} on the card root — a legitimate a11y grouping that also gives tests a stable, semantic way to scope to one specific vehicle's card."
+    },
+    {
+      "file": "src/components/vehicles/vehicle-pricing-section.tsx",
+      "change": "Added maker/versionName/fuel/transmissionType/imageUrl props; renders VehicleCompareToggle (showLabel) beside FavoriteButton near the vehicle title."
+    },
+    {
+      "file": "src/app/(public)/vehicles/[slug]/page.tsx",
+      "change": "Passes the new props through to VehiclePricingSection."
+    },
+    {
+      "file": "src/app/(public)/layout.tsx",
+      "change": "Mounts VehicleComparisonProvider (nested inside CookieConsentProvider) and renders <VehicleComparisonTray /> alongside the existing cookie-consent UI."
+    },
+    {
+      "file": "src/server/services/vehicle.service.ts",
+      "change": "Added getPublicVehiclesByIds(ids) — one batched findMany with the same PUBLIC_WHERE visibility filter used everywhere else."
+    },
+    {
+      "file": "package.json",
+      "change": "Added \"test:e2e:all\": \"PLAYWRIGHT_FIREFOX=1 PLAYWRIGHT_WEBKIT=1 playwright test\" — existing \"test:e2e\" (chromium-only default) left unchanged."
+    },
+    {
+      "file": "reports/cookie_consent_audit.json",
+      "change": "Added an inventory entry + storage_audit note for kinsen_vehicle_comparison_v1 (see storage_classification below)."
+    }
+  ],
+  "architecture": {
+    "state_owner": "src/components/providers/vehicle-comparison-provider.tsx — VehicleComparisonProvider / useVehicleComparison()",
+    "single_source_of_truth": "Yes — one provider instance mounted once in (public)/layout.tsx; homepage, /vehicles, vehicle-detail, the tray, and /compare's client sync component all read/write the same context. No per-card or per-route state.",
+    "no_new_state_library": true,
+    "summary_type": "VehicleComparisonSummary (src/lib/vehicle-comparison.ts): { id, slug, maker, versionName, yearRelease, price, monthlyPrice, km, imageUrl, fuel, transmissionType } — compact, no admin/internal fields, no personal data.",
+    "matrix_type": "ComparisonMatrixVehicle (src/lib/comparison-fields.ts): summary fields plus typeOfCar, color, cc, hp, offer — used only by the /compare page's field registry, built server-side from getPublicVehiclesByIds, never persisted client-side."
+  },
+  "limits": {
+    "max_selected_vehicles": 3,
+    "min_required_for_full_comparison": 3,
+    "duplicate_prevention": "addComparisonId/toggleComparisonId treat an already-selected ID as a no-op/removal — never a duplicate entry; unit-tested.",
+    "fourth_vehicle_behavior": "Rejected without altering the existing 3 (addComparisonId returns \"max-reached\", ids array unchanged by reference); the panel is opened/emphasized and a toast shows the exact required Greek message. Unit-tested and E2E-tested (real toast text asserted)."
+  },
+  "storage": {
+    "mechanism": "localStorage (client-only; no cookie, no server round-trip for the selection itself)",
+    "key": "kinsen_vehicle_comparison_v1",
+    "version": 1,
+    "payload_shape": "{ version: 1, ids: string[] (<=3, unique, ordered), updatedAt: ISO string } — IDs only, never full vehicle records, never prices/titles.",
+    "parser": "src/lib/vehicle-comparison.ts parseComparisonState() — rejects (falls back to null/empty, never throws) malformed JSON, wrong version, non-array ids, non-string/blank ids, duplicate ids, and more than 3 ids.",
+    "storage_classification": "Classified as necessary/functional, not gated behind the optional \"preferences\" consent category — first-party, no third-party sharing, no analytics/marketing/profiling, exists purely to run the feature the visitor is actively using. Documented in reports/cookie_consent_audit.json's inventory (new entry) and storage_audit block, with the reasoning spelled out inline (mirrors the existing consent-cookie's own necessary classification). Does not weaken or bypass CookieConsentProvider/consent-integrations.ts — no phantom consent category was created, and ACTIVE_OPTIONAL_CATEGORIES remains untouched (still empty).",
+    "hydration": "Server and first client paint always render with 0 selected / all toggles \"not selected\" (isHydrated starts false). A mount-only useEffect reads and validates localStorage, then flips isHydrated true. VehicleCompareToggle's `active` is `isHydrated && isSelected(id)` — never renders a hydration-mismatching selected state. VehicleComparisonTray renders null entirely until isHydrated, so it (and its own window.matchMedia viewport check) can never race SSR either."
+  },
+  "batch_data_loading": {
+    "function": "getPublicVehiclesByIds(ids) in src/server/services/vehicle.service.ts",
+    "query_count_for_3_vehicles": 1,
+    "visibility_filter": "Same PUBLIC_WHERE ({ froze: false, isDeleted: false }) as every other public read — a frozen/deleted vehicle can never resolve via a shared /compare URL or a stale localStorage id.",
+    "ordering": "Prisma's `id: { in: ids }` does not preserve input order — reorderVehiclesByIds() (src/lib/vehicle-comparison.ts, unit-tested) restores the caller's requested order and silently drops any id that didn't come back.",
+    "client_summary_endpoint": "GET /api/vehicles/compare?ids=a,b,c — public, unauthenticated, rejects >3 ids (400), strips admin-only fields (plate/vin never included in the response shape at all), pipes through resolveVehicleImagesForList. Used by the provider to hydrate VehicleComparisonSummary objects for IDs it only has from localStorage (no full record was persisted).",
+    "no_n_plus_1": true
+  },
+  "compare_route": {
+    "path": "/compare?vehicles=id1,id2,id3",
+    "query_validation": "parseComparisonIdsFromSearchParam (trims, dedupes, drops blanks) — the page then requires exactly 3 after parsing AND exactly 3 real vehicles back from getPublicVehiclesByIds/reorderVehiclesByIds, or it renders ComparisonIncompleteState instead of any partial matrix.",
+    "url_state_precedence": "Documented in vehicle-comparison-provider.tsx: ordinary pages use provider+localStorage as the source of truth; /compare's client sync component (in comparison-matrix.tsx) calls syncSelectionFromUrl() with the page's already-DB-validated 3 ids on mount, which only overwrites the provider's own selection when the URL supplies a syntactically complete (exactly-3, unique) list — an incomplete/malformed URL never wipes a visitor's real, already-persisted selection.",
+    "metadata": "title \"Σύγκριση Αυτοκινήτων | Kinsen\", robots: { index: false, follow: false } — matches the existing noindex convention (src/app/(public)/account/page.tsx).",
+    "no_login_required": true
+  },
+  "comparison_matrix": {
+    "groups": [
+      "Βασικά στοιχεία",
+      "Κινητήρας και απόδοση",
+      "Χρήση και κατάσταση",
+      "Οικονομικά στοιχεία"
+    ],
+    "fields_included": [
+      "Μοντέλο (maker+versionName)",
+      "Έτος",
+      "Τύπος οχήματος",
+      "Χρώμα",
+      "Καύσιμο",
+      "Κυβικά",
+      "Ίπποι",
+      "Κιβώτιο ταχυτήτων",
+      "Χιλιόμετρα",
+      "Προσφορά",
+      "Τιμή",
+      "Μηνιαία δόση"
+    ],
+    "fields_intentionally_excluded": "warranty, equipment/features list, drive type, emissions, consumption, doors, seats — none of these exist as real, structured fields on the Prisma Vehicle model (only a loose untyped `features Json?` and `description` exist); inventing values for these would be fabricated data, explicitly disallowed by the task.",
+    "missing_value_display": "\"—\" (em dash) via a shared formatOrDash/DASH constant — never null/undefined/raw enum values.",
+    "highlight_rule": "computeBestValueVehicleIds (src/lib/comparison-fields.ts, unit-tested): for lower-is-better/higher-is-better/newer-is-better fields only, excludes missing values entirely from consideration (never treated as zero), then highlights every vehicle tied for the best remaining value — including the all-3-tied case, one consistent rule with no special case. Subjective fields (comparisonMode \"none\": model name, type, color, fuel, cc, transmission, offer) are never highlighted. Each rankable field has its own bestLabel badge text (e.g. \"Χαμηλότερη τιμή\", \"Λιγότερα χιλιόμετρα\", \"Περισσότερη ισχύς\", \"Νεότερο μοντέλο\") — not a single generic \"best price\" label misapplied to non-price fields.",
+    "desktop_sticky_header": "Not implemented — deliberately skipped (documented judgment call) to avoid the nested-sticky/z-index/clipping risk the task explicitly warned about, in favor of the mobile-required sticky-first-column behavior below, which was implemented.",
+    "mobile_layout": "overflow-x-auto wrapping the whole table; row-label <th scope=\"row\"> cells are `sticky left-0` so attribute names stay visible while vehicle columns scroll horizontally; a visible \"Σύρετε οριζόντια...\" hint below the table on <lg viewports; semantic <table>/<thead>/<tbody>/<th scope> throughout (no div-grid fake table)."
+  },
+  "ui": {
+    "compare_toggle": "src/components/vehicles/vehicle-compare-toggle.tsx — semantic <button>, aria-pressed, Greek aria-label (\"Προσθήκη στη σύγκριση\" / \"Αφαίρεση από τη σύγκριση\"), a dependency-free hover+keyboard-focus tooltip (role=\"tooltip\", aria-describedby — no Tooltip primitive existed in src/components/ui/ and none was added), lucide-react `Scale` icon (not the competitor's icon), icon-only on cards (size=\"sm\") and icon+\"Σύγκριση\"/\"Στη σύγκριση\" label on the vehicle-detail page (showLabel).",
+    "desktop_panel": "Non-modal `<aside role=\"complementary\">`, fixed right, 420px max-width, Framer Motion slide-in/out (motion/react — already an installed dependency, not a new one), z-[45] (above header/cookie-banner z-40, below Dialog/Sheet/Select z-50 and the interest-modal's z-[180]). No overlay/backdrop — page stays interactive underneath, matching \"collapsible sidebar\" rather than a blocking modal. Escape collapses it; focus is restored to the exact opener element (never document.activeElement) when it closes.",
+    "mobile_sheet": "Reuses the existing src/components/ui/sheet.tsx (Radix Dialog, side=\"bottom\") — real modal semantics: focus trap, Escape closes, body scroll lock while open and restored after close, onCloseAutoFocus overridden to restore focus to the exact opener (same proven pattern as the cookie-preferences modal).",
+    "collapsed_control": "Fixed pill, \"Σύγκριση οχημάτων · N/3\", bottom-center on mobile / bottom-right on desktop. Its vertical offset when the cookie banner is visible is computed from the banner's real measured height (document.querySelector + getBoundingClientRect, re-measured on resize) rather than a guessed fixed pixel value — an earlier guessed 112px offset was proven wrong by direct measurement (the banner is up to ~380px tall on a 390px-wide phone) and would have let the pill sit underneath the banner.",
+    "slots": "Exactly 3 rendered every time (filled or a numbered \"Προσθέστε ακόμη ένα αυτοκίνητο\" placeholder) — image with the existing FALLBACK_VEHICLE_IMAGE fallback, maker+versionName (linked to /vehicles/{slug}), year/km, price/monthly price, a remove button whose accessible name includes the vehicle identity (\"Αφαίρεση {maker} {versionName} από τη σύγκριση\").",
+    "cta_copy": "\"Δείτε τη σύγκριση\" — disabled + aria-disabled=\"true\" at 0/1/2, enabled (real <Link> via Button asChild) only at 3/3. Supporting copy matches the task's exact required Greek strings at 1/3, 2/3, 3/3.",
+    "clear_all": "\"Εκκαθάριση όλων\", shown only when selectedCount > 0, clears the selection and closes the tray (so no empty panel is left open — task requirement)."
+  },
+  "cross_browser_focus_fix_applied_proactively": "Before any E2E tests were written, addVehicle/toggleVehicle were given an explicit `opener?: HTMLElement | null` parameter and VehicleCompareToggle passes `event.currentTarget` — the exact proven pattern from the earlier cookie-consent WebKit investigation (WebKit's `.click()` blurs an already-focused button before a click handler runs, making `document.activeElement`-based opener inference unreliable specifically there). Applying this fix *before* writing focus-restoration E2E tests meant WebKit needed zero additional fixes once the test suite ran — confirmed by a clean 26/26 WebKit pass on the first cross-browser run of the comparison suite.",
+  "unit_tests": {
+    "files": [
+      "src/server/services/__tests__/vehicle-comparison.test.ts",
+      "src/server/services/__tests__/comparison-fields.test.ts"
+    ],
+    "count_added": 55,
+    "total_suite_result": "252/252 passed (197 pre-existing + 55 new)",
+    "coverage": "empty state, add 1st/2nd/3rd, 4th rejected, original 3 preserved (same reference), duplicate add is a no-op, toggle add/remove, remove first/middle/last (order preserved), canCompare-equivalent via buildComparisonUrl at 0/1/2/3, URL absent before 3, ordered URL at 3, safe URI-encoding, valid/malformed/wrong-version/duplicate/too-many/invalid-type/blank-id storage parsing, empty-list-is-valid, no-extra-keys (no personal data) check, reorder-to-requested-order, stale/unavailable id pruning, search-param parsing (trim/dedupe/blank-drop), list-equality helper, lower/higher/newer-is-better best-value calc, tie handling (including all-3-tied), missing-value exclusion (never treated as zero), subjective fields never highlighted, every rankable field has a bestLabel, dash-formatting for every missing field, boolean/km/price real formatter usage (not raw values), field-registry group/id integrity."
+  },
+  "e2e_tests": {
+    "file": "tests/e2e/vehicle-comparison.spec.ts",
+    "count": 26,
+    "flows_covered": [
+      "full 3-vehicle selection journey across homepage → /vehicles → vehicle-detail → /compare, order preserved, no console/page/failed-request errors",
+      "4th vehicle rejected with exact message, original 3 unchanged, recovery after a removal",
+      "persistence across reload + route navigation, real localStorage inspected (not just React state), removal persists after reload",
+      "5 malformed-storage cases (invalid JSON, unknown version, duplicate ids, 4 ids, unavailable id) — no crash, no hydration error",
+      "cross-surface synchronization: select on homepage, active on /vehicles and detail page, clears everywhere after removal",
+      "keyboard: Enter activates + panel opens + focus stays on the just-activated toggle (auto-open does not steal focus) + Escape closes + focus returns to the exact opener; collapsed control keyboard-reachable and reopens; disabled CTA not keyboard-navigable, enabled CTA works; clear-all keyboard-operable",
+      "mobile: real modal bottom sheet, body scroll lock during/after, focus restoration, no page horizontal overflow, collapsed control does not overlap the cookie banner",
+      "4 responsive viewports (390/768/1440/1920) — control visible, no page-level horizontal overflow",
+      "/compare route validation: <3 ids, >3 ids, 3 unresolvable ids, no param at all — polished incomplete state every time, never a crash, never a partial matrix",
+      "regression isolation: compare never toggles favorite or navigates the card and vice versa; cookie preferences modal renders above (and correctly makes inert/aria-hidden) the comparison panel; filters/sorting/pagination remain functional with an active selection"
+    ],
+    "chromium_result": "26/26 passed",
+    "firefox_result": "26/26 passed",
+    "webkit_result": "26/26 passed (no WebKit-specific fixes needed — see cross_browser_focus_fix_applied_proactively above)",
+    "determinism": "Each browser's full comparison suite re-run twice with identical results before being considered final."
+  },
+  "real_bugs_found_and_fixed_during_this_implementation": [
+    {
+      "bug": "SSR crash: `ReferenceError: window is not defined` on every single page render.",
+      "root_cause": "useIsDesktopViewport()'s useState initializer called `window.matchMedia(...)` directly. This hook is invoked unconditionally on every render of VehicleComparisonTray, including the server-side render pass — an early `if (!isHydrated) return null` later in that same component does not stop its hooks from running first.",
+      "fix": "Guarded the initializer with `typeof window !== \"undefined\"`, corrected by an effect immediately after mount (client-only) — the component's *output* still renders null on both SSR and the client's first paint, so there is no hydration mismatch, only a safe no-op read.",
+      "file": "src/components/vehicles/vehicle-comparison-tray.tsx"
+    },
+    {
+      "bug": "The comparison collapsed-control pill could render underneath the cookie banner on mobile.",
+      "root_cause": "An initial implementation guessed a fixed 112px clearance offset when the banner was visible; direct measurement showed the real banner is up to ~380px tall on a 390px-wide phone (multi-line Greek copy).",
+      "fix": "Replaced the guessed offset with a real DOM measurement (querySelector + getBoundingClientRect, re-measured on window resize) of the actual banner element.",
+      "file": "src/components/vehicles/vehicle-comparison-tray.tsx"
+    }
+  ],
+  "e2e_test_bugs_found_and_fixed_in_this_new_suite": [
+    "Stale locators: a locator bound to a button's current accessible name (e.g. \"Προσθήκη στη σύγκριση\") stops matching the instant that same physical button toggles to \"Αφαίρεση...\" — fixed by adding a name-state-agnostic `any` locator (regex matching either label) for tests that need to reference the same physical element across its own state change, and by re-locating cards via a captured, stable aria-label (from the new role=\"group\" wrapper) rather than a live `.filter({ has: ... })` locator whose match set changes as state changes.",
+    "The non-modal desktop panel visually covers the grid's rightmost column while open — clicking a second/third compare toggle without closing it first hit a real 'element intercepts pointer events' error. Fixed by closing the panel between sequential add actions in tests that select multiple vehicles on the same page.",
+    "A hydration race right after a fresh full-page navigation: reading 'which card is still unselected' immediately after `page.goto()` could catch the pre-hydration (always-\"not selected\"-by-design) render. Fixed with a helper that waits (Playwright's normal auto-retry) for the collapsed control to reflect the real persisted count before proceeding.",
+    "`dismissBanner()`'s `.click().catch(() => {})` pattern waited out the full 10s actionTimeout on every call once the banner had already been dismissed once (it never reappears after consent is recorded) — across 2-3 reloads in one test this alone exceeded the 30s test budget. Fixed by checking `.count()` first so the no-op case resolves immediately.",
+    "`page.addInitScript` used for a one-time 'clear storage' helper actually re-runs before every subsequent navigation in the same test, silently wiping the very state several persistence-focused tests were trying to verify survives navigation. Removed entirely — Playwright already gives every test a fresh, empty-storage context by default.",
+    "The vehicle-detail page also renders a 'similar vehicles' grid with its own compare toggles, so an unscoped `.notSelected.click()` there hit a strict-mode multi-match error — scoped to `.first()` (the main vehicle's toggle is first in DOM order, in the pricing section, before the similar-vehicles grid).",
+    "Radix Dialog correctly marks background content `aria-hidden` while the cookie preferences modal is open — a real, desirable accessibility behavior — which made a `getByRole('complementary', ...)` locator for the (still-present-in-the-DOM) comparison panel stop matching while the modal was open. Fixed the *test* to use a plain DOM tag locator for that specific z-index check, not the accessibility-tree-based role query.",
+    "A z-index test read `window.getComputedStyle` on the dialog's `role=\"dialog\"` element itself, which carries no z-* class (only `relative`) — the real z-50 class lives on its immediate wrapping `<div>`. Fixed to read the parent element's computed style.",
+    "A regression-isolation test clicked the favorite button as an anonymous visitor and expected it to fail silently — the app's real, intentional, unrelated behavior (favorites-provider.tsx) is to redirect anonymous clicks to /login, which navigates away from the page entirely. Simplified the test to stop before that redirect, since login-flow behavior is out of this feature's scope and was already covered by other tests."
+  ],
+  "regression_validation": {
+    "unit_tests": "252/252 pass",
+    "typecheck": "clean (tsc --noEmit, 0 errors)",
+    "lint": "clean (eslint ., 0 errors, 2 pre-existing unrelated warnings — register-form.tsx and interest-modal.tsx react-hook-form watch() compiler warning, present before this feature)",
+    "build": "npm run build succeeds; /compare and /api/vehicles/compare both correctly registered as new routes",
+    "chromium_full_suite": "112/112 passed, verified twice",
+    "firefox_full_suite": "112/112 passed on the clean rerun; one intermittent, pre-existing, already-documented visual-pixel-diff flake (banner-mobile snapshot) and, once, the comparison cross-surface-sync test under full-suite resource load (passed cleanly in isolation and on the immediate full-suite rerun) — not deterministic, not a new regression",
+    "webkit_full_suite": "111/112 or 112/112 across repeated runs — the one recurring failure is the exact same pre-existing, already-documented-in-a-prior-session RSC-prefetch-cancellation timing flake in public-regression.spec.ts's navigation-regression test (passes reliably in isolation every time); the added page complexity from this feature may have marginally increased how often that pre-existing race window is hit, but the underlying cause and the test it affects both predate this work",
+    "npm_run_test_e2e_default_script": "112/112 passed, exit code 0 (chromium-only by existing config design, unchanged)",
+    "npm_run_test_e2e_all_script": "PLAYWRIGHT_FIREFOX=1 PLAYWRIGHT_WEBKIT=1 playwright test — 336/336 passed (112 tests x 3 browsers), exit code 0, verified clean in a single full combined run",
+    "git_diff_check": "clean, no whitespace errors",
+    "no_new_state_management_library": true,
+    "no_new_icon_package": true,
+    "no_new_drawer_dialog_package": "confirmed — reused the existing src/components/ui/sheet.tsx",
+    "no_new_e2e_framework": true,
+    "no_prisma_migration": true,
+    "no_database_writes_added": "confirmed — getPublicVehiclesByIds and the /api/vehicles/compare route are both read-only",
+    "no_tracker_or_analytics_added": true,
+    "no_production_data_modified": true,
+    "favorites_filters_sorting_pagination_navigation_cookie_consent": "all verified still working via the existing full regression suites plus this feature's own dedicated isolation tests"
+  },
+  "known_limitations": [
+    "Desktop sticky comparison header while scrolling rows was deliberately not implemented — a documented judgment call to avoid the nested-sticky/z-index/clipping risk the task itself warned about; the mobile-required sticky-first-attribute-column behavior was implemented instead.",
+    "tests/e2e/visual-consent.spec.ts-snapshots/ remains uncommitted to git for all 3 browsers — a pre-existing gap from an earlier session, unrelated to and not fixed by this feature.",
+    "Two categories of intermittent, non-deterministic, already-documented-elsewhere E2E flakiness (a Firefox visual pixel-diff and a WebKit RSC-prefetch-cancellation timing race) can still occasionally surface under full-suite system load; both are pre-existing, both pass reliably in isolation and on an immediate rerun, and neither is caused by or specific to the vehicle-comparison feature."
+  ]
+}

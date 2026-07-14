@@ -2,8 +2,10 @@ import Image from "next/image";
 import { NavigationLink as Link } from "@/components/navigation/navigation-link";
 import { Gauge, Cog as EngineIcon, Fuel } from "lucide-react";
 import { FavoriteButton } from "@/components/vehicles/favorite-button";
+import { VehicleCompareToggle } from "@/components/vehicles/vehicle-compare-toggle";
 import { Badge } from "@/components/ui/badge";
 import { cn, formatEuro, formatKm, FALLBACK_VEHICLE_IMAGE } from "@/lib/utils";
+import type { VehicleComparisonSummary } from "@/lib/vehicle-comparison";
 
 export type VehicleCardVariant = "default" | "featured" | "related" | "listing";
 
@@ -74,6 +76,20 @@ export function VehicleCard({
   const mainImage =
     vehicle.images?.find((img) => img.isMain)?.url ?? vehicle.images?.[0]?.url ?? FALLBACK_VEHICLE_IMAGE;
 
+  const comparisonSummary: VehicleComparisonSummary = {
+    id: vehicle.id,
+    slug: vehicle.slug,
+    maker: vehicle.maker,
+    versionName: vehicle.versionName,
+    yearRelease: vehicle.yearRelease ?? null,
+    price: vehicle.price ?? null,
+    monthlyPrice: vehicle.monthlyPrice ?? null,
+    km: vehicle.km ?? null,
+    imageUrl: mainImage,
+    fuel: vehicle.fuel ?? null,
+    transmissionType: vehicle.transmissionType ?? null,
+  };
+
   const stats = [
     vehicle.km !== null && vehicle.km !== undefined ? { icon: Gauge, label: formatKm(vehicle.km) } : null,
     vehicle.cc !== null && vehicle.cc !== undefined ? { icon: EngineIcon, label: `${vehicle.cc}cc` } : null,
@@ -82,6 +98,8 @@ export function VehicleCard({
 
   return (
     <div
+      role="group"
+      aria-label={`${vehicle.maker} ${vehicle.versionName}`}
       className={cn(
         "group relative flex h-full flex-col overflow-hidden rounded-card border bg-white shadow-soft",
         variant === "featured"
@@ -93,7 +111,10 @@ export function VehicleCard({
               : "border-border transition-shadow hover:shadow-card",
       )}
     >
-      <FavoriteButton vehicleId={vehicle.id} className="absolute right-3 top-3 z-10" />
+      <div className="absolute right-3 top-3 z-10 flex items-center gap-2">
+        <VehicleCompareToggle vehicle={comparisonSummary} size="sm" />
+        <FavoriteButton vehicleId={vehicle.id} size="sm" />
+      </div>
 
       <Link href={`/vehicles/${vehicle.slug}`} className="relative block h-[250px] w-full overflow-hidden bg-white">
         <Image

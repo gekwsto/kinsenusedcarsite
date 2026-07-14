@@ -97,11 +97,17 @@ export default async function VehicleDetailPage({ params }: { params: Promise<Pa
         <div className="rounded-2xl border border-primary/10 bg-white p-5 shadow-[0_18px_55px_rgba(2,56,89,0.08)] sm:p-7">
           <VehiclePricingSection
             vehicleId={vehicle.id}
+            vehicleSlug={vehicle.slug}
             vehicleLabel={vehicleLabel}
+            maker={vehicle.maker}
+            versionName={vehicle.versionName}
             yearRelease={vehicle.yearRelease}
             km={vehicle.km}
             monthlyPrice={vehicle.monthlyPrice}
             price={vehicle.price}
+            fuel={vehicle.fuel}
+            transmissionType={vehicle.transmissionType}
+            imageUrl={resolvedGallery.mainImage.url}
           />
 
           {/* Specs grid */}

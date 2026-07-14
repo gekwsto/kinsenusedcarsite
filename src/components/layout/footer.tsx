@@ -1,6 +1,8 @@
 import Image from "next/image";
 import { Mail, Phone, MapPin, Facebook, Instagram, Linkedin } from "lucide-react";
+import { NavigationLink as Link } from "@/components/navigation/navigation-link";
 import { getSiteSettings } from "@/server/services/settings.service";
+import { CookieSettingsButton } from "@/components/layout/cookie-settings-button";
 
 const GROUP_LINKS = [
   { label: "Europcar", href: "https://www.europcar.com/en-us" },
@@ -96,6 +98,16 @@ export async function Footer() {
               </a>
             </li>
           ))}
+        </ul>
+        <ul className="mt-4 flex list-none flex-wrap items-center justify-center gap-x-6 gap-y-1.5 text-xs text-white/80">
+          <li>
+            <Link href="/privacy-policy" className="hover:text-white hover:underline">
+              Πολιτική Προστασίας Δεδομένων
+            </Link>
+          </li>
+          <li>
+            <CookieSettingsButton className="hover:text-white hover:underline" />
+          </li>
         </ul>
         <p className="mt-4 text-xs text-white/70">© {year} Kinsen Hellas. All rights reserved.</p>
       </div>

@@ -1,0 +1,117 @@
+{
+  "audit_status": "COMPLETE",
+  "timestamp": "2026-07-13T00:00:00Z",
+  "scope": "Full application audit of first-party cookies, third-party cookies, localStorage, sessionStorage, analytics, marketing, and functional storage — basis for the cookie consent banner/modal implementation.",
+  "method": "Static source search (grep) across src for document.cookie, cookies(), localStorage, sessionStorage, next/script, <Script>, analytics/marketing SDK identifiers (gtag, googletagmanager, GoogleAnalytics, clarity, hotjar, fbq, MetaPixel), NEXT_PUBLIC_ env usage, and package.json dependencies. Cross-checked NextAuth (next-auth v5 beta / @auth/core) cookie names directly against the installed package source.",
+  "findings": {
+    "analytics_integrations_found": [],
+    "marketing_integrations_found": [],
+    "third_party_scripts_found": [],
+    "note": "No Google Analytics, Google Tag Manager, Microsoft Clarity, Hotjar, Meta/Facebook Pixel, or any other analytics/marketing SDK is present anywhere in src or package.json. No <Script> component or manually injected <script> tag loads any third-party integration. No NEXT_PUBLIC_ environment variable is referenced in src. This is a clean slate — no fabricated integrations were added to make the consent UI look more complete than the real application."
+  },
+  "inventory": [
+    {
+      "name": "authjs.session-token",
+      "alt_name_production": "__Secure-authjs.session-token",
+      "source": "next-auth v5 (@auth/core), first-party",
+      "provider": "Kinsen (self-hosted, via NextAuth Credentials provider)",
+      "purpose": "Authenticated session (JWT strategy) — required for login, account page, favorites API calls, admin access.",
+      "category": "necessary",
+      "duration": "NextAuth default JWT session maxAge (30 days) unless overridden; not overridden in src/lib/auth.ts",
+      "first_or_third_party": "first-party",
+      "http_only": true,
+      "loads_before_consent": true,
+      "gating_action_required": "none — required for explicitly-requested login/session functionality; must never be gated behind optional consent",
+      "deletion_on_revocation": "not applicable (necessary; never revocable via this consent system) — normal sign-out clears it via next-auth's own signOut() flow"
+    },
+    {
+      "name": "authjs.csrf-token",
+      "alt_name_production": "__Host-authjs.csrf-token",
+      "source": "next-auth v5 (@auth/core), first-party",
+      "provider": "Kinsen (self-hosted, via NextAuth)",
+      "purpose": "CSRF protection for authentication form submissions (login/register).",
+      "category": "necessary",
+      "duration": "Browser session (NextAuth default)",
+      "first_or_third_party": "first-party",
+      "http_only": true,
+      "loads_before_consent": true,
+      "gating_action_required": "none — security-critical",
+      "deletion_on_revocation": "not applicable (necessary)"
+    },
+    {
+      "name": "authjs.callback-url",
+      "source": "next-auth v5 (@auth/core), first-party",
+      "provider": "Kinsen (self-hosted, via NextAuth)",
+      "purpose": "Stores the post-login redirect target during the authentication flow.",
+      "category": "necessary",
+      "duration": "Browser session (NextAuth default)",
+      "first_or_third_party": "first-party",
+      "http_only": true,
+      "loads_before_consent": true,
+      "gating_action_required": "none — required for the login flow to return the user to the right page",
+      "deletion_on_revocation": "not applicable (necessary)"
+    },
+    {
+      "name": "kinsen_cookie_consent_v1",
+      "source": "This implementation — src/lib/cookie-consent.ts",
+      "provider": "Kinsen (first-party, no external service)",
+      "purpose": "Stores the user's own cookie-category choices (which categories they accepted/rejected) so the banner does not reappear on every visit.",
+      "category": "necessary",
+      "duration": "180 days (COOKIE_CONSENT_MAX_AGE_DAYS)",
+      "first_or_third_party": "first-party",
+      "http_only": false,
+      "loads_before_consent": true,
+      "gating_action_required": "none — this cookie IS the consent-preference storage itself; it cannot logically require its own consent",
+      "deletion_on_revocation": "not applicable (this is the consent record itself, not a category-gated cookie)"
+    },
+    {
+      "name": "kinsen_vehicle_comparison_v1",
+      "source": "Vehicle-comparison feature — src/lib/vehicle-comparison.ts (mechanism: browser localStorage, not a cookie)",
+      "provider": "Kinsen (first-party, no external service)",
+      "purpose": "Stores the ordered list of up to 3 public vehicle IDs a visitor has explicitly added to the vehicle-comparison tray, so the selection survives page navigation and a browser refresh. IDs only — never full vehicle records, prices, titles, or any personal/customer data (see src/lib/vehicle-comparison.ts's VehicleComparisonStoredState shape).",
+      "category": "necessary",
+      "category_rationale": "This is first-party, purely functional state that exists only to fulfil the exact feature the visitor is actively using (comparing vehicles they themselves selected) — it is not analytics, not marketing, not profiling, is never sent to a third party, and does not track behavior across sessions/sites. It carries no re-identifying value beyond 'these 3 catalog IDs were picked,' the same category of state as, e.g., a shopping-cart or filter selection. Classified as necessary-equivalent functional storage rather than gated behind the optional 'preferences' category — the same reasoning already applied to the consent cookie itself: gating a feature's own use of it behind a consent choice the feature does not depend on would add friction without any real privacy benefit. If the consent-integration registry (src/lib/consent-integrations.ts) is later extended with an optional-category feature that has a genuine privacy trade-off, this decision should be revisited independently; today ACTIVE_OPTIONAL_CATEGORIES is empty, so no such trade-off exists to weigh.",
+      "duration": "Persists until the visitor clears it (removes all 3 vehicles via 'Εκκαθάριση όλων', clears site data, or a future TTL is introduced) — no fixed expiry is currently set.",
+      "first_or_third_party": "first-party",
+      "http_only": "not applicable (localStorage, not a cookie — never sent to the server as a request header; only read by this app's own client-side JavaScript, and re-validated server-side via getPublicVehiclesByIds before any data is served back)",
+      "loads_before_consent": true,
+      "gating_action_required": "none — see category_rationale",
+      "deletion_on_revocation": "not applicable (not gated by the consent system); the feature's own 'Εκκαθάριση όλων' control clears it directly, and the versioned parser (parseComparisonState) safely discards/ignores any invalid or unrecognized stored value rather than trusting it"
+    }
+  ],
+  "storage_audit": {
+    "localStorage_usage_in_src": "One key as of the vehicle-comparison feature: kinsen_vehicle_comparison_v1 (see inventory above) — versioned, IDs-only, parsed/validated by src/lib/vehicle-comparison.ts's parseComparisonState before use. No other localStorage usage found.",
+    "sessionStorage_usage_in_src": "none found",
+    "document_cookie_direct_usage_in_src": "none found prior to the cookie-consent implementation",
+    "favorites_storage_mechanism": "Server-backed via authenticated API calls (/api/favorites/*), identified by the necessary session cookie above. No separate client-side storage (no localStorage, no dedicated cookie) — see src/components/providers/favorites-provider.tsx. Not classified as its own consent category; it rides entirely on the necessary auth session."
+  },
+  "category_classification": {
+    "necessary": [
+      "authjs.session-token / __Secure-authjs.session-token",
+      "authjs.csrf-token / __Host-authjs.csrf-token",
+      "authjs.callback-url",
+      "kinsen_cookie_consent_v1",
+      "kinsen_vehicle_comparison_v1"
+    ],
+    "preferences": [],
+    "analytics": [],
+    "marketing": []
+  },
+  "consent_modal_category_rendering_decision": {
+    "necessary": "rendered — real inventory above, status 'Πάντα ενεργά'",
+    "preferences": "NOT rendered — no non-essential functional/preference storage or integration exists anywhere in the application",
+    "analytics": "NOT rendered — no analytics integration exists",
+    "marketing": "NOT rendered — no marketing/advertising integration exists",
+    "rationale": "Per the task's own instruction (section 11/24): only render a category row when real inventory exists for it. The typed consent state (CookieConsentState) still carries preferences/analytics/marketing boolean fields for forward-compatibility, and accept-all/reject-non-essential still set them consistently, but the UI does not fabricate switches for categories with nothing behind them."
+  },
+  "scripts_currently_gated": [],
+  "scripts_requiring_future_gating_when_added": {
+    "analytics": "None yet. When an analytics integration (e.g. GA4/GTM) is added, wrap its <Script> in the AnalyticsScripts component (src/components/cookie-consent/consent-script-gate.tsx), which already reads consent.analytics and is mounted once in the (public) layout.",
+    "marketing": "None yet. Same pattern via MarketingScripts in the same file, reading consent.marketing."
+  },
+  "unresolved_items": [],
+  "notes": [
+    "No secrets, tokens, or actual cookie VALUES are recorded in this report — only cookie names, providers, purposes, categories, and durations.",
+    "This audit reflects the source tree at the time of writing. If a new script/tracker/cookie is added later, this file and the inventory arrays in src/lib/cookie-consent.ts should be updated together."
+  ]
+}

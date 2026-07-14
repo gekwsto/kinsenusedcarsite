@@ -1,0 +1,125 @@
+{
+  "report_status": "COMPLETE — investigated, bug NOT reproduced, regression guards added",
+  "incident_summary": "A report described the Cookie Preferences modal rendering generic English fallback/demo content (\"Necessary cookies are required to enable the basic features...\", \"Functional cookies help perform...\", \"Analytical cookies are used...\", \"Always Active\", English category names Necessary/Functional/Analytics/Marketing).",
+  "investigation": {
+    "source_code_search": {
+      "method": "Full-repository grep for every exact reported string, excluding node_modules/.next/playwright-report/test-results",
+      "result": "Zero matches anywhere in src/, tests/, public/, or package.json for any of the reported fragments, any English quoted category name (\"Necessary\"/\"Functional\"/\"Analytics\"/\"Marketing\"), or any third-party CMP package (CookieYes, Cookiebot, OneTrust, ConsentManager, Termly, Iubenda, Complianz)."
+    },
+    "duplicate_modal_search": {
+      "method": "Searched for any second CookiePreferences/CookieSettings/cookie-preferences/cookie-modal component",
+      "result": "Exactly one modal implementation exists: src/components/cookie-consent/cookie-preferences-modal.tsx, mounted once in src/app/(public)/layout.tsx. Both the banner's settings button and the footer's settings button open the same modal instance through the same CookieConsentProvider state (openPreferences/preferencesOpen) — confirmed by reading src/components/cookie-consent/cookie-banner.tsx and src/components/layout/cookie-settings-button.tsx, both of which call the identical useCookieConsent().openPreferences()."
+    },
+    "clean_build_verification": {
+      "method": "rm -rf .next && npm run build, then grep the fresh compiled output for the reported strings",
+      "result": "Zero matches in the freshly compiled .next output."
+    },
+    "live_rendered_dom_verification": {
+      "method": "Started the isolated Playwright production server, drove a real Chromium browser via a standalone script, clicked the banner's settings button, and read the actual rendered dialog's innerText directly from the DOM.",
+      "result": "dialog count: 1. Rendered text is exactly: title 'Ρυθμίσεις Cookies', the Greek introduction, 'Αναγκαία' / 'Πάντα ενεργά', the necessary-cookie inventory (authjs.session-token, authjs.csrf-token, kinsen_cookie_consent_v2), the necessary-only message 'Αυτή τη στιγμή ο ιστότοπος χρησιμοποιεί μόνο αναγκαία cookies.', and the three Greek action buttons. Contains none of the reported English strings.",
+      "screenshot": "cookie-preferences-before-fix.png (captured during this same run — labeled 'before-fix' per the task's requested naming, though it shows the already-correct state, since no incorrect state exists to capture)"
+    },
+    "service_worker_check": "None exists in the repository (no sw.js, no service-worker file of any kind)."
+  },
+  "conclusion": {
+    "root_cause": "NOT DETERMINED — the reported behavior does not reproduce in this repository's current state, in a clean rebuild, or in a live rendered browser. No code change was required or made to the modal's rendering logic.",
+    "classification": "Unreproducible — possible explanations include a stale browser tab/cache from before this modal's original implementation, a different environment, or a different repository; none of these can be confirmed or ruled out from within this repository alone.",
+    "action_taken": "Per explicit user direction after being shown this investigation, no fix was applied (there is nothing to fix). Instead, permanent regression guards were added — both a static source-level guard and a live rendered-DOM guard — so that if this content, or a duplicate modal, is ever actually introduced in the future, it fails automated tests immediately rather than requiring another manual investigation."
+  },
+  "architecture_confirmed_already_correct": {
+    "single_modal": true,
+    "single_state_owner": "CookieConsentProvider (src/components/providers/cookie-consent-provider.tsx) — openPreferences/preferencesOpen/lastTriggerRef",
+    "registry_driven_rendering": "src/components/cookie-consent/cookie-preferences-modal.tsx's ModalBody renders optional categories via `categoryViewModels.map(...)` where `categoryViewModels = getConsentCategoryViewModels()` (src/lib/consent-integrations.ts) — a single generic map over registry-derived view models, with zero per-category conditional JSX branches. Confirmed via the new static guard test (see below) that no `category === \"analytics\"`-style special case exists.",
+    "presentation_layer_separation": "CATEGORY_COPY (Greek labels/descriptions for preferences/analytics/marketing) is a presentation-only lookup table inside the modal component — it supplies copy for a category ONLY once getConsentCategoryViewModels() has already decided that category is active; it has no ability to add a category to the rendered list itself. Proven by the existing and new unit tests: an empty registry always produces zero view models regardless of CATEGORY_COPY containing entries for all three categories.",
+    "invariant": "visible optional category ⇔ at least one enabled registry integration belongs to that category — enforced by getActiveOptionalCategories()/getConsentCategoryViewModels(), both pure functions of the registry array only."
+  },
+  "production_registry_state": {
+    "CONSENT_INTEGRATIONS": [],
+    "ENABLED_CONSENT_INTEGRATIONS": [],
+    "ACTIVE_OPTIONAL_CATEGORIES": [],
+    "categories_rendered_today": [
+      "Αναγκαία (always)"
+    ],
+    "optional_switches_rendered_today": 0
+  },
+  "necessary_category_content": {
+    "label": "Αναγκαία",
+    "status_badge": "Πάντα ενεργά",
+    "description": "Χρησιμοποιούνται πάντα για τη σύνδεση/συνεδρία λογαριασμού, την ασφάλεια (προστασία CSRF) και την αποθήκευση των ίδιων των προτιμήσεών σας για τα cookies. Δεν μπορούν να απενεργοποιηθούν.",
+    "privacy_claim_accuracy": "Does not claim necessary cookies store no personal/identifiable data (the banned generic English claim explicitly warned against) — the description only states their functional purpose (session/CSRF/consent-preference storage), which is accurate and verifiable against the real necessary-cookie inventory below.",
+    "necessary_cookie_inventory_shown": [
+      {
+        "name": "authjs.session-token",
+        "purpose": "συνεδρία σύνδεσης λογαριασμού"
+      },
+      {
+        "name": "authjs.csrf-token",
+        "purpose": "προστασία από επιθέσεις CSRF"
+      },
+      {
+        "name": "kinsen_cookie_consent_v2",
+        "purpose": "αποθήκευση των επιλογών σας για τα cookies"
+      }
+    ],
+    "necessary_only_message": "Αυτή τη στιγμή ο ιστότοπος χρησιμοποιεί μόνο αναγκαία cookies."
+  },
+  "future_dynamic_behavior": {
+    "adding_analytics": "Enabling a real analytics integration in CONSENT_INTEGRATIONS (enabled: true) automatically makes getActiveOptionalCategories() include \"analytics\", which makes getConsentCategoryViewModels() include an 'analytics' entry, which the existing categoryViewModels.map() renders as an 'Ανάλυσης' accordion row with a switch and the real integration's inventory (displayName/provider/description/cookies) — zero modal JSX changes required.",
+    "adding_marketing": "Identical mechanism — produces 'Εμπορικής προώθησης'.",
+    "adding_preferences": "Identical mechanism — produces 'Λειτουργικά / Προτιμήσεων'.",
+    "multiple_integrations_same_category": "getConsentCategoryViewModels() groups all enabled integrations sharing a category into that category's single `integrations` array — confirmed by a new unit test with two distinct analytics fixtures (MOCK_ANALYTICS + MOCK_ANALYTICS_SECOND) producing exactly one 'analytics' view model listing both.",
+    "no_jsx_edit_required_for_a_supported_category": true
+  },
+  "files_changed": [
+    {
+      "file": "src/server/services/__tests__/consent-ui-content-guard.test.ts",
+      "change": "NEW — static regression guard: scans consent-UI source files for the banned English fragments/quoted category names, asserts exactly one modal file exists, asserts no third-party CMP package is a dependency, asserts the modal has no per-category hardcoded conditional branch."
+    },
+    {
+      "file": "src/server/services/__tests__/cookie-consent.test.ts",
+      "change": "Added 8 new unit tests: marketing-only view model, preferences-only view model, disabled-integration-excluded-alongside-enabled, two-integrations-same-category-one-row, deterministic canonical view-model ordering, minimal-metadata-does-not-crash, and a direct assertion that the real production registry (CONSENT_INTEGRATIONS) produces zero view models today. New fixtures added: MOCK_PREFERENCES, MOCK_ANALYTICS_SECOND, MOCK_MINIMAL_INTEGRATION (all test-only, never added to the production registry)."
+    },
+    {
+      "file": "tests/e2e/cookie-consent.spec.ts",
+      "change": "Added one new Playwright test asserting the real rendered modal's innerText contains none of the reported banned English fragments, and that exactly one role=dialog exists — a live-DOM complement to the static source-level guard."
+    }
+  ],
+  "files_removed": [],
+  "production_code_changed": false,
+  "unit_test_result": "264/264 pass (257 pre-existing/from earlier session work + a net 8 new tests in cookie-consent.test.ts, plus 4 new tests in the new consent-ui-content-guard.test.ts — total 264 reflects the running suite after this task's additions on top of prior work)",
+  "e2e_result": {
+    "cookie_consent_spec_chromium": "31/31 passed",
+    "cookie_consent_spec_firefox": "31/31 passed",
+    "cookie_consent_spec_webkit": "31/31 passed",
+    "npm_run_test_e2e": "113/113 passed, exit code 0",
+    "npm_run_test_e2e_all": "339/339 passed (113 x 3 browsers), exit code 0, verified on a clean rerun after one run hit the same pre-existing, already-documented, non-deterministic privacy-policy.spec.ts flake (unrelated to consent-modal content, passes reliably in isolation)"
+  },
+  "screenshots": {
+    "directory": "/private/tmp/claude-501/-Users-konstantinoskefalas-Downloads-kinsenusedcarsite/0bd1bd61-d09d-4e00-93ec-f98b9e7c7e29/scratchpad/ (session scratchpad, not committed to the repo — review artifacts only, per this repo existing convention of not committing transient visual-review screenshots)",
+    "files": [
+      "cookie-preferences-before-fix.png",
+      "cookie-modal-necessary-only-390.png",
+      "cookie-modal-necessary-only-768.png",
+      "cookie-modal-necessary-only-1440.png",
+      "cookie-modal-necessary-inventory-expanded-1440.png (accordion toggled — actually shows the collapsed state, since the necessary category is expanded by default; both states inspected and correct)",
+      "cookie-modal-from-footer-1440.png",
+      "cookie-modal-above-comparison-ui-1440.png"
+    ],
+    "all_visually_inspected_by_agent": true,
+    "result": "All Greek, premium, no clipping, no overflow, correct button wrapping/stacking at 390px, restrained max-width at 1440px (not full-screen/template-like), correct z-index layering above the vehicle-comparison sidebar (confirmed both visually and by the pre-existing automated z-index assertion in tests/e2e/vehicle-comparison.spec.ts)."
+  },
+  "regression_validation": {
+    "typecheck": "clean",
+    "lint": "clean (2 pre-existing unrelated warnings)",
+    "clean_build": "rm -rf .next && npm run build succeeds; fresh .next output greped for the banned strings — zero matches",
+    "consent_behavior_unchanged": "kinsen_cookie_consent_v2, version 2, policy-fingerprint validation, legacy v1 deletion, malformed-cookie fallback, normalized necessary-only Accept All/Reject/Save (all optional flags false today) — all unchanged and covered by pre-existing passing tests",
+    "no_tracker_added": true,
+    "no_fake_integration_added_to_production_registry": true,
+    "no_dependency_added": true,
+    "no_migration_added": true,
+    "privacy_policy_text_unchanged": true
+  },
+  "remaining_limitations": [
+    "The origin of the original report could not be determined from within this repository — if the generic English content is ever seen again in a real browser, capturing the exact URL, a fresh screenshot, and the browser's DevTools 'view page source' (not just rendered DOM) at that moment would be the fastest way to identify whether it's a caching/CDN/proxy artifact outside this codebase, a different deployed version, or a genuinely different repository."
+  ]
+}

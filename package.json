@@ -9,6 +9,10 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "node --env-file-if-exists=.env --import tsx --test src/server/services/__tests__/**/*.test.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:all": "PLAYWRIGHT_FIREFOX=1 PLAYWRIGHT_WEBKIT=1 playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:report": "playwright show-report",
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
@@ -41,6 +45,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.10.5",
     "@types/nodemailer": "^6.4.17 || ^7.0.0",
