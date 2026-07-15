@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Save, RotateCcw } from "lucide-react";
+import Image from "next/image";
+import { Save, RotateCcw, UploadCloud } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,6 +18,66 @@ import type {
   InfoHeroContent,
   InfoCardsContent,
 } from "@/lib/content-defaults";
+
+/**
+ * Uploads a new image for `sectionKey` and stages the returned URL into
+ * the section's local (unsaved) form state via `onChange` — mirrors how
+ * every text field here behaves: the change only actually persists once
+ * the section's own "Αποθήκευση" button PATCHes the whole record.
+ */
+function ImageUploadField({
+  sectionKey,
+  label,
+  value,
+  onChange,
+}: {
+  sectionKey: ContentKey;
+  label: string;
+  value: string;
+  onChange: (url: string) => void;
+}) {
+  const { toast } = useToast();
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = React.useState(false);
+
+  async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(`/api/admin/content/${sectionKey}/image`, { method: "POST", body: formData });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Αποτυχία μεταφόρτωσης εικόνας");
+      }
+      const { url } = (await res.json()) as { url: string };
+      onChange(url);
+      toast({ title: "Η εικόνα ανέβηκε", description: "Πατήστε Αποθήκευση για να την εφαρμόσετε." });
+    } catch (error) {
+      toast({ title: "Σφάλμα", description: error instanceof Error ? error.message : "Κάτι πήγε στραβά", variant: "destructive" });
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <Label>{label}</Label>
+      <div className="flex items-center gap-3">
+        <div className="relative h-16 w-24 shrink-0 overflow-hidden rounded-md border border-border bg-surface">
+          {value && <Image src={value} alt="" fill sizes="96px" className="object-cover" />}
+        </div>
+        <Button type="button" variant="outline" size="sm" disabled={uploading} onClick={() => fileInputRef.current?.click()}>
+          <UploadCloud className="h-3.5 w-3.5" /> {uploading ? "Μεταφόρτωση…" : "Αλλαγή εικόνας"}
+        </Button>
+        <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+      </div>
+    </div>
+  );
+}
 
 function useContentSection<T>(sectionKey: ContentKey, initialValue: T) {
   const { toast } = useToast();
@@ -92,6 +153,7 @@ export function HeroEditor({ initialValue }: { initialValue: HeroContent }) {
             <Input value={value.line2} onChange={(e) => setValue({ ...value, line2: e.target.value })} />
           </div>
         </div>
+        <ImageUploadField sectionKey="home.hero" label="Φωτογραφία φόντου" value={value.image} onChange={(image) => setValue({ ...value, image })} />
         <SectionActions onSave={save} onReset={reset} saving={saving} />
       </CardContent>
     </Card>
@@ -167,7 +229,7 @@ export function HowItWorksEditor({ initialValue }: { initialValue: HowItWorksCon
 export function BenefitsEditor({ initialValue }: { initialValue: BenefitsContent }) {
   const { value, setValue, save, reset, saving } = useContentSection<BenefitsContent>("home.benefits", initialValue);
 
-  const updateCard = (index: number, field: "title" | "description", text: string) => {
+  const updateCard = (index: number, field: "title" | "description" | "image", text: string) => {
     const cards = value.cards.map((card, i) => (i === index ? { ...card, [field]: text } : card));
     setValue({ cards });
   };
@@ -179,7 +241,13 @@ export function BenefitsEditor({ initialValue }: { initialValue: BenefitsContent
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           {value.cards.map((card, index) => (
             <div key={index} className="space-y-2 rounded-lg border border-border p-3">
-              <p className="text-xs font-semibold text-ink-muted">Κάρτα {index + 1} (η εικόνα δεν επεξεργάζεται εδώ)</p>
+              <p className="text-xs font-semibold text-ink-muted">Κάρτα {index + 1}</p>
+              <ImageUploadField
+                sectionKey="home.benefits"
+                label="Φωτογραφία"
+                value={card.image}
+                onChange={(image) => updateCard(index, "image", image)}
+              />
               <Input value={card.title} onChange={(e) => updateCard(index, "title", e.target.value)} placeholder="Τίτλος" />
               <Textarea
                 rows={5}
@@ -218,6 +286,7 @@ export function InfoHeroEditor({
           <Label>Υπότιτλος</Label>
           <Input value={value.subtitle} onChange={(e) => setValue({ ...value, subtitle: e.target.value })} />
         </div>
+        <ImageUploadField sectionKey={sectionKey} label="Φωτογραφία" value={value.image} onChange={(image) => setValue({ ...value, image })} />
         <SectionActions onSave={save} onReset={reset} saving={saving} />
       </CardContent>
     </Card>

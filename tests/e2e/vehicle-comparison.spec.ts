@@ -184,13 +184,18 @@ test.describe("vehicle comparison — selection journey", () => {
     await tray.cta.click();
     await page.waitForURL(/\/compare\?vehicles=/);
 
-    // Exactly 3 vehicle columns, in original selection order.
+    // Exactly 3 vehicle columns, in original selection order. The
+    // comparison matrix's own title is maker+versionName (unchanged,
+    // out of scope for the versionName-only card-display fix) while
+    // firstCardName/etc. come from the card's aria-label (versionName
+    // only) — so the matrix name is asserted to *end with* the card
+    // name (same vehicle, same order) rather than match it exactly.
     const summaryLinks = page.locator("main a[href^='/vehicles/']");
     await expect(summaryLinks).toHaveCount(3);
     const renderedNames = await summaryLinks.allTextContents();
-    expect(renderedNames[0]?.trim()).toBe(firstCardName);
-    expect(renderedNames[1]?.trim()).toBe(secondCardName);
-    expect(renderedNames[2]?.trim()).toBe(thirdCardName);
+    expect(renderedNames[0]?.trim().endsWith(firstCardName!)).toBe(true);
+    expect(renderedNames[1]?.trim().endsWith(secondCardName!)).toBe(true);
+    expect(renderedNames[2]?.trim().endsWith(thirdCardName!)).toBe(true);
 
     assertNoRuntimeErrors(runtimeGuard);
     assertNoFailedFirstPartyRequests(failedRequests);
@@ -225,12 +230,14 @@ test.describe("vehicle comparison — selection journey", () => {
     await page.waitForURL(/\/compare\?vehicles=/);
 
     // Exactly 2 vehicle columns — no undefined 3rd slot, no layout gap left
-    // by a stale fixed 3-column grid.
+    // by a stale fixed 3-column grid. The matrix's own title is
+    // maker+versionName (unchanged) while the card aria-labels are
+    // versionName only, so this asserts "ends with" rather than equality.
     const summaryLinks = page.locator("main a[href^='/vehicles/']");
     await expect(summaryLinks).toHaveCount(2);
     const renderedNames = await summaryLinks.allTextContents();
-    expect(renderedNames[0]?.trim()).toBe(firstCardName);
-    expect(renderedNames[1]?.trim()).toBe(secondCardName);
+    expect(renderedNames[0]?.trim().endsWith(firstCardName!)).toBe(true);
+    expect(renderedNames[1]?.trim().endsWith(secondCardName!)).toBe(true);
 
     // The matrix table also renders exactly 2 data columns per row (plus
     // the leading label column), never a 3rd blank one.

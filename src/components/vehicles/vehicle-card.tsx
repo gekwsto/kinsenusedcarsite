@@ -99,7 +99,7 @@ export function VehicleCard({
   return (
     <div
       role="group"
-      aria-label={`${vehicle.maker} ${vehicle.versionName}`}
+      aria-label={vehicle.versionName}
       className={cn(
         "group relative flex h-full flex-col overflow-hidden rounded-card border bg-white shadow-soft",
         variant === "featured"
@@ -119,7 +119,7 @@ export function VehicleCard({
       <Link href={`/vehicles/${vehicle.slug}`} className="relative block h-[250px] w-full overflow-hidden bg-white">
         <Image
           src={mainImage}
-          alt={`${vehicle.maker} ${vehicle.versionName}`}
+          alt={vehicle.versionName}
           fill
           priority={priority}
           sizes="(min-width: 1024px) 25vw, (min-width: 640px) 45vw, 90vw"
@@ -131,9 +131,7 @@ export function VehicleCard({
       </Link>
 
       <Link href={`/vehicles/${vehicle.slug}`} className="flex flex-1 flex-col items-center gap-1.5 px-4 py-5 text-center">
-        <h3 className="text-base font-semibold text-ink">
-          {vehicle.maker} {vehicle.versionName}
-        </h3>
+        <h3 className="text-base font-semibold text-ink">{vehicle.versionName}</h3>
         <p className="text-sm text-ink-muted">{vehicle.yearRelease ?? 0}</p>
 
         {vehicle.monthlyPrice ? (

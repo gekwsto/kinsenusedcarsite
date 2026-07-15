@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { ContentKey } from "@/lib/content-defaults";
 
-const heroSchema = z.object({ line1: z.string().min(1), line2: z.string().min(1) });
+const heroSchema = z.object({ line1: z.string().min(1), line2: z.string().min(1), image: z.string().min(1) });
 const statsSchema = z.object({
   heading: z.string().min(1),
   paragraph1: z.string().min(1),
@@ -13,9 +13,9 @@ const howItWorksSchema = z.object({
   steps: z.array(z.object({ title: z.string().min(1), description: z.string().min(1) })).length(5),
 });
 const benefitsSchema = z.object({
-  cards: z.array(z.object({ title: z.string().min(1), description: z.string().min(1) })).length(3),
+  cards: z.array(z.object({ title: z.string().min(1), description: z.string().min(1), image: z.string().min(1) })).length(3),
 });
-const infoHeroSchema = z.object({ title: z.string().min(1), subtitle: z.string() });
+const infoHeroSchema = z.object({ title: z.string().min(1), subtitle: z.string(), image: z.string().min(1) });
 const infoCardsSchema = z.object({
   cards: z.array(z.object({ title: z.string().min(1), body: z.string().min(1) })).min(1),
 });

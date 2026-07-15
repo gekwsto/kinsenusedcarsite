@@ -61,6 +61,14 @@ export async function uploadVehicleImage(file: File, vehicleId: string): Promise
   return getDriver().upload(file, `vehicles/${vehicleId}`);
 }
 
+// `sectionKey` is a ContentKey (e.g. "home.hero") — kept as `string` here
+// rather than importing that type to avoid this low-level upload module
+// depending on the content-defaults module for a value it only ever uses
+// as an opaque folder-name segment.
+export async function uploadContentImage(file: File, sectionKey: string): Promise<UploadResult> {
+  return getDriver().upload(file, `content/${sectionKey}`);
+}
+
 export async function removeUploadedImage(url: string): Promise<void> {
   return getDriver().remove(url);
 }

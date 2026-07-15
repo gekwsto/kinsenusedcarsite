@@ -50,7 +50,12 @@ export default async function VehicleDetailPage({ params }: { params: Promise<Pa
     resolveVehicleImages(vehicle),
   ]);
   const similarVehicles = await resolveVehicleImagesForList(similarVehiclesRaw);
-  const vehicleLabel = `${vehicle.maker} ${vehicle.versionName}${vehicle.yearRelease ? ` ${vehicle.yearRelease}` : ""}`;
+  // versionName already includes the maker (e.g. "Volvo XC40"), so this is
+  // deliberately not prefixed with vehicle.maker again — doing so used to
+  // render a duplicated brand name here, in the interest-modal's "Για το
+  // όχημα: …" text, and in the JSON-LD `name` field, since all three read
+  // this same vehicleLabel.
+  const vehicleLabel = `${vehicle.versionName}${vehicle.yearRelease ? ` ${vehicle.yearRelease}` : ""}`;
 
   const specs: { icon: typeof Car; label: string; value: string }[] = [
     { icon: Car, label: "Μάρκα", value: vehicle.maker || "-" },

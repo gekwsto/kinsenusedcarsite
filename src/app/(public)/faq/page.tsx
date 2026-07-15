@@ -27,7 +27,7 @@ export default async function FaqPage() {
   return (
     <div>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <InfoHero image="/images/faq.png" title={hero.title} subtitle={hero.subtitle || undefined} />
+      <InfoHero image={hero.image} title={hero.title} subtitle={hero.subtitle || undefined} />
       <InfoCardGrid cards={items.map((item) => ({ title: item.question, content: <p>{item.answer}</p> }))} />
     </div>
   );

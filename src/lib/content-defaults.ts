@@ -7,6 +7,7 @@
 export interface HeroContent {
   line1: string;
   line2: string;
+  image: string;
 }
 
 export interface StatsContent {
@@ -29,6 +30,7 @@ export interface HowItWorksContent {
 export interface BenefitCardContent {
   title: string;
   description: string;
+  image: string;
 }
 
 export interface BenefitsContent {
@@ -38,6 +40,7 @@ export interface BenefitsContent {
 export interface InfoHeroContent {
   title: string;
   subtitle: string;
+  image: string;
 }
 
 export interface InfoCardContent {
@@ -53,6 +56,7 @@ export const CONTENT_DEFAULTS = {
   "home.hero": {
     line1: "Βρες το επόμενο",
     line2: "αυτοκίνητό σου",
+    image: "/images/banner.png",
   } satisfies HeroContent,
 
   "home.stats": {
@@ -81,16 +85,19 @@ export const CONTENT_DEFAULTS = {
         title: "Οικονομία & Προβλέψιμο Κόστος",
         description:
           "Το leasing μεταχειρισμένου αυτοκινήτου σας βοηθά να έχετε καλύτερο έλεγχο του κόστους, χωρίς το άγχος της ιδιοκτησίας. Με ξεκάθαρους όρους, η Kinsen προσφέρει λύση για όσους θέλουν αυτοκίνητο με περισσότερη ευελιξία και λιγότερες δεσμεύσεις.",
+        image: "/images/kinsencar.png",
       },
       {
         title: "Ταξιδέψτε ηλεκτρικά",
         description:
           "Ανακαλύψτε διαθέσιμα μεταχειρισμένα αυτοκίνητα με leasing από την Kinsen, επιλεγμένα για να καλύπτουν καθημερινές, επαγγελματικές και προσωπικές ανάγκες μετακίνησης. Βρείτε το μοντέλο που σας ταιριάζει, με απλή διαδικασία και αξιόπιστη υποστήριξη σε κάθε βήμα.",
+        image: "/images/hondaphoto.jpg",
       },
       {
         title: "Άνεση στην Οδήγηση, Ευελιξία στην Επιλογή",
         description:
           "Επιλέξτε μέσα από σύγχρονα μεταχειρισμένα μοντέλα που συνδυάζουν άνεση, αξιοπιστία και πρακτικότητα. Είτε χρειάζεστε αυτοκίνητο για την πόλη, για ταξίδια ή για καθημερινή χρήση, η Kinsen σας βοηθά να κινηθείτε πιο έξυπνα, με λύσεις leasing προσαρμοσμένες στις ανάγκες σας.",
+        image: "/images/couple.jpg",
       },
     ],
   } satisfies BenefitsContent,
@@ -98,6 +105,7 @@ export const CONTENT_DEFAULTS = {
   "financing.hero": {
     title: "Αποκτήστε το επόμενο σας αυτοκίνητο με ευέλικτη δανειοδότηση",
     subtitle: "Με σταθερό επιτόκιο 7% και αποπληρωμή έως 48 μήνες",
+    image: "/images/keys.jpg",
   } satisfies InfoHeroContent,
 
   "financing.cards": {
@@ -132,6 +140,7 @@ export const CONTENT_DEFAULTS = {
   "warranty.hero": {
     title: "Απόλυτη σιγουριά με την Εγγύηση Kinsen",
     subtitle: "Καλύπτουμε τα σημαντικότερα μηχανικά μέρη για έως και 12 μήνες",
+    image: "/images/egguhsh.jpg",
   } satisfies InfoHeroContent,
 
   "warranty.cards": {
@@ -166,11 +175,13 @@ export const CONTENT_DEFAULTS = {
   "contact.hero": {
     title: "Επικοινωνία",
     subtitle: "Είμαστε εδώ για να σας βοηθήσουμε σε κάθε απορία σας !",
+    image: "/images/communication.jpg",
   } satisfies InfoHeroContent,
 
   "faq.hero": {
     title: "Συχνές Ερωτήσεις",
     subtitle: "",
+    image: "/images/faq.png",
   } satisfies InfoHeroContent,
 };
 

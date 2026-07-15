@@ -15,7 +15,7 @@ export default async function FinancingPage() {
 
   return (
     <div>
-      <InfoHero image="/images/keys.jpg" title={hero.title} subtitle={hero.subtitle} />
+      <InfoHero image={hero.image} title={hero.title} subtitle={hero.subtitle} />
       <InfoCardGrid cards={cards.map((card) => ({ title: card.title, content: <CardBody text={card.body} /> }))} />
     </div>
   );

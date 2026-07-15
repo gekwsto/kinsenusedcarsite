@@ -248,36 +248,57 @@ export async function getPublicFilterOptions() {
 
 // ---------- Admin ----------
 
-export async function listAdminVehicles(params: {
+export interface AdminVehicleListFilters {
   search?: string;
   status?: "active" | "frozen" | "deleted" | "offer";
   maker?: string;
   fuel?: string;
   transmissionType?: string;
-  page?: number;
-  pageSize?: number;
-}) {
-  const page = params.page ?? 1;
-  const pageSize = params.pageSize ?? 20;
+}
+
+/**
+ * Pure where-clause builder for the admin vehicle list — separated from
+ * `listAdminVehicles` (like `buildPublicFilterWhere` above) so the exact
+ * filter logic is directly unit-testable without a database.
+ *
+ * Soft-deleted vehicles are excluded from every view except the explicit
+ * "deleted" filter — a just-deleted vehicle must never reappear in the
+ * default ("all statuses") list, nor under "frozen"/"offer" (those two
+ * previously never touched `isDeleted` at all, so a frozen-then-deleted or
+ * offer-then-deleted vehicle stayed visible under those filters too).
+ */
+export function buildAdminVehicleWhere(filters: AdminVehicleListFilters): Prisma.VehicleWhereInput {
   const where: Prisma.VehicleWhereInput = {};
 
-  if (params.status === "active") Object.assign(where, { froze: false, isDeleted: false });
-  if (params.status === "frozen") where.froze = true;
-  if (params.status === "deleted") where.isDeleted = true;
-  if (params.status === "offer") where.offer = true;
-  if (params.maker) where.maker = params.maker;
-  if (params.fuel) where.fuel = params.fuel;
-  if (params.transmissionType) where.transmissionType = params.transmissionType;
+  if (filters.status === "deleted") {
+    where.isDeleted = true;
+  } else {
+    where.isDeleted = false;
+    if (filters.status === "active") where.froze = false;
+    if (filters.status === "frozen") where.froze = true;
+    if (filters.status === "offer") where.offer = true;
+  }
+  if (filters.maker) where.maker = filters.maker;
+  if (filters.fuel) where.fuel = filters.fuel;
+  if (filters.transmissionType) where.transmissionType = filters.transmissionType;
 
-  if (params.search) {
+  if (filters.search) {
     where.OR = [
-      { maker: { contains: params.search, mode: "insensitive" } },
-      { model: { contains: params.search, mode: "insensitive" } },
-      { externalCarId: { contains: params.search, mode: "insensitive" } },
-      { vin: { contains: params.search, mode: "insensitive" } },
-      { plate: { contains: params.search, mode: "insensitive" } },
+      { maker: { contains: filters.search, mode: "insensitive" } },
+      { model: { contains: filters.search, mode: "insensitive" } },
+      { externalCarId: { contains: filters.search, mode: "insensitive" } },
+      { vin: { contains: filters.search, mode: "insensitive" } },
+      { plate: { contains: filters.search, mode: "insensitive" } },
     ];
   }
+
+  return where;
+}
+
+export async function listAdminVehicles(params: AdminVehicleListFilters & { page?: number; pageSize?: number }) {
+  const page = params.page ?? 1;
+  const pageSize = params.pageSize ?? 20;
+  const where = buildAdminVehicleWhere(params);
 
   const [items, total] = await Promise.all([
     prisma.vehicle.findMany({

@@ -22,7 +22,7 @@ export default async function ContactPage() {
       <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-2">
         <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl shadow-lg">
           <Image
-            src="/images/communication.jpg"
+            src={hero.image}
             alt="Επικοινωνία"
             fill
             priority

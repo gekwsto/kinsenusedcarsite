@@ -7,7 +7,7 @@ export async function Hero() {
   return (
     <div className="relative h-[70vh] min-h-[420px] w-full overflow-hidden">
       <Image
-        src="/images/banner.png"
+        src={content.image}
         alt="Kinsen hero image"
         fill
         priority
