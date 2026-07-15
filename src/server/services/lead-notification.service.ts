@@ -47,28 +47,62 @@ interface EmailContent {
   html: string;
 }
 
-function htmlShell(title: string, bodyHtml: string): string {
+// Absolute URL, never a relative path: nearly every email client renders
+// images by fetching them straight from the recipient's own mail app, with
+// no notion of "this document's own origin" the way a browser tab has —
+// a relative "/images/..." src would just 404 against the mail client's
+// own (nonexistent) base URL. Reuses the same env-driven getSiteUrl() that
+// vehiclePublicUrl() already relies on for the exact same reason.
+function logoUrl(): string {
+  return `${getSiteUrl()}/images/kinsen_logowhite.png`;
+}
+
+/**
+ * Shared visual shell for both lead emails — solid colors and table-based
+ * layout only (no gradients, no web fonts, no flexbox/grid): the safe
+ * subset that actually renders consistently across Outlook/Gmail/Apple
+ * Mail, rather than degrading gracefully in some and not at all in others.
+ */
+function htmlShell(title: string, bodyHtml: string, settings?: SiteSettings): string {
+  const socialLinks = settings
+    ? [
+        settings.socialLinks.facebook ? { label: "Facebook", href: settings.socialLinks.facebook } : null,
+        settings.socialLinks.instagram ? { label: "Instagram", href: settings.socialLinks.instagram } : null,
+        settings.socialLinks.linkedin ? { label: "LinkedIn", href: settings.socialLinks.linkedin } : null,
+      ].filter((link): link is { label: string; href: string } => link !== null)
+    : [];
+
   return `<!doctype html>
 <html lang="el">
   <body style="margin:0;padding:0;background:#eef3f7;font-family:Arial,Helvetica,sans-serif;color:#1f2933;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef3f7;padding:32px 16px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef3f7;padding:40px 16px;">
       <tr>
         <td align="center">
-          <table role="presentation" width="100%" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;" cellpadding="0" cellspacing="0">
+          <table role="presentation" width="100%" style="max-width:600px;background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 20px 45px rgba(2,56,89,0.12);" cellpadding="0" cellspacing="0">
             <tr>
-              <td style="background:#023859;padding:22px 32px;">
-                <p style="margin:0;font-size:19px;font-weight:bold;letter-spacing:0.03em;color:#ffffff;">KINSEN</p>
+              <td style="background:#00899a;height:6px;line-height:6px;font-size:0;">&nbsp;</td>
+            </tr>
+            <tr>
+              <td style="background:#023859;padding:40px 32px;text-align:center;">
+                <img src="${logoUrl()}" width="150" alt="Kinsen" style="display:block;width:150px;height:auto;margin:0 auto;border:0;outline:none;" />
               </td>
             </tr>
             <tr>
-              <td style="padding:32px;">
-                <h1 style="margin:0 0 18px;font-size:19px;color:#023859;">${escapeHtml(title)}</h1>
+              <td style="padding:40px 36px 32px;">
+                <h1 style="margin:0 0 22px;font-size:22px;line-height:1.35;color:#023859;">${escapeHtml(title)}</h1>
                 ${bodyHtml}
               </td>
             </tr>
             <tr>
-              <td style="background:#f5f9fc;padding:16px 32px;border-top:1px solid #e2e8f0;">
-                <p style="margin:0;font-size:11px;color:#94a3b8;text-align:center;">Kinsen Hellas &middot; ${new Date().getFullYear()}</p>
+              <td style="background:#f5f9fc;padding:24px 36px;border-top:1px solid #e2e8f0;">
+                ${
+                  socialLinks.length > 0
+                    ? `<p style="margin:0 0 10px;font-size:12px;text-align:center;color:#7b8794;">${socialLinks
+                        .map((link) => `<a href="${escapeHtml(link.href)}" style="color:#00899a;text-decoration:none;font-weight:bold;">${escapeHtml(link.label)}</a>`)
+                        .join('<span style="color:#cbd5e1;"> &middot; </span>')}</p>`
+                    : ""
+                }
+                <p style="margin:0;font-size:11px;color:#9aa5b1;text-align:center;">Kinsen Hellas &middot; ${new Date().getFullYear()}</p>
               </td>
             </tr>
           </table>
@@ -87,16 +121,19 @@ function htmlShell(title: string, bodyHtml: string): string {
  */
 export function buildCustomerConfirmationEmail(lead: LeadWithVehicle, settings: SiteSettings): EmailContent {
   const interestLabel = INTEREST_TYPE_LABELS[lead.interestType];
-  const vehicleLine = lead.vehicle ? `${lead.vehicle.maker} ${lead.vehicle.versionName}` : null;
+  // versionName already includes the maker (e.g. "BMW Series 1 116i..."),
+  // so this is deliberately not prefixed with lead.vehicle.maker again —
+  // doing so rendered the brand twice in this exact email.
+  const vehicleLine = lead.vehicle ? lead.vehicle.versionName : null;
   const publicUrl = vehiclePublicUrl(lead.vehicle);
 
-  const subject = "Λάβαμε το ενδιαφέρον σας — Kinsen";
+  const subject = vehicleLine ? `Λάβαμε το ενδιαφέρον σας για ${vehicleLine} — Kinsen` : "Λάβαμε το ενδιαφέρον σας — Kinsen";
 
   const text = [
     `Γεια σας ${lead.firstName},`,
     "",
-    `Λάβαμε το αίτημά σας ενδιαφέροντος για ${interestLabel}${vehicleLine ? ` σχετικά με το όχημα ${vehicleLine}` : ""}.`,
-    "Ένας εκπρόσωπος της Kinsen θα επικοινωνήσει μαζί σας σύντομα.",
+    `Σας ευχαριστούμε που επιλέξατε την Kinsen. Λάβαμε το αίτημά σας ενδιαφέροντος για ${interestLabel}${vehicleLine ? ` σχετικά με το όχημα ${vehicleLine}` : ""} και η ομάδα μας το εξετάζει ήδη.`,
+    "Ένας εκπρόσωπος της Kinsen θα επικοινωνήσει μαζί σας σύντομα, για να σας καθοδηγήσει στο επόμενο βήμα.",
     ...(publicUrl ? ["", `Δείτε το όχημα: ${publicUrl}`] : []),
     "",
     "Στοιχεία επικοινωνίας Kinsen:",
@@ -112,22 +149,40 @@ export function buildCustomerConfirmationEmail(lead: LeadWithVehicle, settings: 
   const html = htmlShell(
     "Λάβαμε το ενδιαφέρον σας",
     [
-      `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Γεια σας <strong>${escapeHtml(lead.firstName)}</strong>,</p>`,
-      `<p style="margin:0 0 20px;font-size:15px;line-height:1.6;">Λάβαμε το αίτημά σας ενδιαφέροντος για <strong>${escapeHtml(interestLabel)}</strong>${
-        vehicleLine ? ` σχετικά με το όχημα <strong>${escapeHtml(vehicleLine)}</strong>` : ""
-      }.</p>`,
-      `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 24px;background:#f0f9fa;border-radius:10px;"><tr><td style="padding:14px 18px;font-size:14px;line-height:1.5;color:#023859;">Ένας εκπρόσωπος της Kinsen θα επικοινωνήσει μαζί σας σύντομα.</td></tr></table>`,
+      `<p style="margin:0 0 18px;font-size:16px;line-height:1.6;">Γεια σας <strong>${escapeHtml(lead.firstName)}</strong>,</p>`,
+      `<p style="margin:0 0 28px;font-size:15px;line-height:1.7;color:#3c4a56;">Σας ευχαριστούμε που επιλέξατε την <strong style="color:#023859;">Kinsen</strong>. Λάβαμε με επιτυχία το ενδιαφέρον σας και η ομάδα μας εξετάζει ήδη το αίτημά σας — ένας εκπρόσωπός μας θα επικοινωνήσει μαζί σας σύντομα για να σας καθοδηγήσει στο επόμενο βήμα.</p>`,
+
+      // Vehicle summary card — the request at a glance: interest-type chip,
+      // vehicle name, and (when known) the year, in one visually distinct,
+      // "receipt-like" block rather than buried in a sentence.
+      `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 24px;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;">
+        <tr><td style="padding:22px 24px;background:#f7fafc;">
+          <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="background:#e6f6f8;border-radius:999px;padding:5px 14px;">
+            <span style="font-size:11px;font-weight:bold;letter-spacing:0.04em;text-transform:uppercase;color:#00727f;">${escapeHtml(interestLabel)}</span>
+          </td></tr></table>
+          ${
+            vehicleLine
+              ? `<p style="margin:14px 0 0;font-size:19px;font-weight:bold;color:#023859;">${escapeHtml(vehicleLine)}</p>${
+                  lead.vehicle?.yearRelease ? `<p style="margin:4px 0 0;font-size:13px;color:#7b8794;">Μοντέλο ${escapeHtml(String(lead.vehicle.yearRelease))}</p>` : ""
+                }`
+              : ""
+          }
+        </td></tr>
+      </table>`,
+
+      `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 28px;background:#f0f9fa;border-radius:10px;"><tr><td style="padding:16px 20px;font-size:14px;line-height:1.6;color:#023859;">&#10003;&nbsp;&nbsp;Ένας εκπρόσωπος της Kinsen θα επικοινωνήσει μαζί σας σύντομα.</td></tr></table>`,
       publicUrl
-        ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 28px;"><tr><td style="border-radius:8px;background:#00899a;"><a href="${escapeHtml(publicUrl)}" style="display:inline-block;padding:12px 26px;font-size:14px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:8px;">Δείτε το όχημα &rarr;</a></td></tr></table>`
+        ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 32px;"><tr><td style="border-radius:10px;background:#00899a;box-shadow:0 8px 20px rgba(0,137,154,0.28);"><a href="${escapeHtml(publicUrl)}" style="display:inline-block;padding:14px 30px;font-size:14px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:10px;">Δείτε το όχημα &rarr;</a></td></tr></table>`
         : "",
-      `<p style="margin:0 0 10px;font-size:11px;font-weight:bold;letter-spacing:0.04em;text-transform:uppercase;color:#94a3b8;">Στοιχεία επικοινωνίας</p>`,
+      `<p style="margin:0 0 12px;font-size:11px;font-weight:bold;letter-spacing:0.04em;text-transform:uppercase;color:#94a3b8;">Στοιχεία επικοινωνίας</p>`,
       `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 24px;">`,
-      `<tr><td style="padding:3px 0;font-size:13px;color:#52616f;">${escapeHtml(settings.contactPhone)}</td></tr>`,
-      `<tr><td style="padding:3px 0;font-size:13px;color:#52616f;">${escapeHtml(settings.contactEmail)}</td></tr>`,
-      `<tr><td style="padding:3px 0;font-size:13px;color:#52616f;">${escapeHtml(settings.address)}</td></tr>`,
+      `<tr><td style="padding:4px 0;font-size:13px;color:#52616f;"><strong style="color:#023859;">Τηλέφωνο:</strong> ${escapeHtml(settings.contactPhone)}</td></tr>`,
+      `<tr><td style="padding:4px 0;font-size:13px;color:#52616f;"><strong style="color:#023859;">Email:</strong> <a href="mailto:${escapeHtml(settings.contactEmail)}" style="color:#00899a;text-decoration:none;">${escapeHtml(settings.contactEmail)}</a></td></tr>`,
+      `<tr><td style="padding:4px 0;font-size:13px;color:#52616f;"><strong style="color:#023859;">Διεύθυνση:</strong> ${escapeHtml(settings.address)}</td></tr>`,
       `</table>`,
       `<p style="margin:0;padding-top:16px;border-top:1px solid #e2e8f0;font-size:11px;line-height:1.5;color:#9aa5b1;">Αυτό είναι ένα αυτοματοποιημένο μήνυμα, δεν χρειάζεται απάντηση. Τα στοιχεία σας χρησιμοποιούνται αποκλειστικά για την εξυπηρέτηση του αιτήματός σας.</p>`,
     ].join("\n"),
+    settings,
   );
 
   return { subject, text, html };
@@ -150,7 +205,9 @@ export function buildInternalNotificationEmail(lead: LeadWithVehicle): EmailCont
 
   const vehicleTextLines = lead.vehicle
     ? [
-        `Όχημα: ${lead.vehicle.maker} ${lead.vehicle.versionName}`,
+        // versionName already includes the maker — see the identical note
+        // in buildCustomerConfirmationEmail above.
+        `Όχημα: ${lead.vehicle.versionName}`,
         `Έτος: ${lead.vehicle.yearRelease ?? "-"}`,
         `Τιμή: ${formatEuro(lead.vehicle.price?.toString())}`,
         `Μηνιαίο: ${formatEuro(lead.vehicle.monthlyPrice?.toString())}`,
@@ -174,7 +231,7 @@ export function buildInternalNotificationEmail(lead: LeadWithVehicle): EmailCont
 
   const vehicleHtmlRows = lead.vehicle
     ? [
-        row("Όχημα", `${lead.vehicle.maker} ${lead.vehicle.versionName}`),
+        row("Όχημα", lead.vehicle.versionName),
         row("Έτος", String(lead.vehicle.yearRelease ?? "-")),
         row("Τιμή", formatEuro(lead.vehicle.price?.toString())),
         row("Μηνιαίο", formatEuro(lead.vehicle.monthlyPrice?.toString())),
