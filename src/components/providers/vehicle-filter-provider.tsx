@@ -66,13 +66,12 @@ export type ActiveFilterChip =
   | { id: string; label: string; ariaLabel: string; kind: "offer" };
 
 // One label per numeric field with a rendered control in the filter panel,
-// used only to build the human-readable active-filter chip for it —
-// `monthlyPriceMin`/`monthlyPriceMax` are deliberately excluded: they're
-// part of the canonical filter schema but have no input in the sidebar, so
-// there would be no way to remove a chip for them.
+// used only to build the human-readable active-filter chip for it.
 const NUMERIC_CHIP_LABEL: Partial<Record<NumericField, (value: string) => string>> = {
   priceMin: (v) => `Από ${formatEuro(v)}`,
   priceMax: (v) => `Έως ${formatEuro(v)}`,
+  monthlyPriceMin: (v) => `Leasing από ${formatEuro(v)}`,
+  monthlyPriceMax: (v) => `Leasing έως ${formatEuro(v)}`,
   yearMin: (v) => `Έτος από ${v}`,
   yearMax: (v) => `Έτος έως ${v}`,
   kmMin: (v) => `Χλμ από ${new Intl.NumberFormat("el-GR").format(Number(v))}`,

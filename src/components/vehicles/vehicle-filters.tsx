@@ -12,11 +12,17 @@ import { PriceRangeSlider } from "@/components/vehicles/price-range-slider";
 import { NumericRangeSelect } from "@/components/vehicles/numeric-range-select";
 import { FilterToggleButton } from "@/components/vehicles/filter-toggle-button";
 import { resolveFuelIcon, resolveTransmissionIcon, resolveVehicleTypeIcon, DEALS_ICON } from "@/components/vehicles/filter-option-metadata";
+import { MakerBadge } from "@/components/vehicles/maker-badge";
 import { FILTER_TRIGGER_CLASS } from "@/components/vehicles/filter-typography";
 import { createNumericRange } from "@/lib/numeric-range";
-import { formatKm } from "@/lib/utils";
+import { cn, formatKm } from "@/lib/utils";
 import { normalizeForSearch as normalizeColorTerm, colorMatchesSearch, colorGroupKey, compareColors } from "@/lib/color-search";
-import { VEHICLE_FILTER_RANGES } from "@/lib/validators/vehicle.schema";
+import {
+  VEHICLE_FILTER_RANGES,
+  VEHICLE_MONTHLY_PRICE_FILTER_MIN,
+  VEHICLE_MONTHLY_PRICE_FILTER_MAX,
+  VEHICLE_MONTHLY_PRICE_FILTER_STEP,
+} from "@/lib/validators/vehicle.schema";
 import {
   useVehicleFilterContext,
   type ActiveFilterChip,
@@ -87,12 +93,14 @@ type VehicleFilterSection = "price" | "maker" | "year" | "km" | "fuel" | "cc" | 
 const ALL_SECTIONS: VehicleFilterSection[] = ["price", "maker", "year", "km", "fuel", "cc", "hp", "transmissionType", "color", "typeOfCar", "offers"];
 
 // Maps every canonical numeric/csv field that has a rendered control to the
-// section that owns it. `monthlyPriceMin`/`monthlyPriceMax` are
-// deliberately absent — same reason NUMERIC_CHIP_LABEL omits them in the
-// provider: there is no rendered control/section for them.
+// section that owns it. `monthlyPriceMin`/`monthlyPriceMax` share the
+// "price" section — same AccordionItem as the purchase-price slider, just a
+// second stacked slider underneath it.
 const FIELD_TO_SECTION: Partial<Record<NumericField | CsvField, VehicleFilterSection>> = {
   priceMin: "price",
   priceMax: "price",
+  monthlyPriceMin: "price",
+  monthlyPriceMax: "price",
   yearMin: "year",
   yearMax: "year",
   kmMin: "km",
@@ -267,12 +275,28 @@ export function VehicleFilters({ options }: { options: VehicleFilterOptions }) {
       <Accordion type="multiple" value={openSections} onValueChange={setOpenSections}>
         <AccordionItem value="price">
           <AccordionTrigger className={TRIGGER_CLASS}>Τιμή</AccordionTrigger>
-          <AccordionContent className="space-y-3">
-            <PriceRangeSlider
-              minValue={draft.priceMin}
-              maxValue={draft.priceMax}
-              onCommit={(min, max) => setDraft((prev) => ({ ...prev, priceMin: min, priceMax: max }))}
-            />
+          <AccordionContent className="space-y-5">
+            <div className="space-y-2">
+              <p className="text-xs font-bold uppercase tracking-wide text-ink-muted">Αγορά</p>
+              <PriceRangeSlider
+                minValue={draft.priceMin}
+                maxValue={draft.priceMax}
+                onCommit={(min, max) => setDraft((prev) => ({ ...prev, priceMin: min, priceMax: max }))}
+              />
+            </div>
+            <div className="space-y-2 border-t border-border/70 pt-4">
+              <p className="text-xs font-bold uppercase tracking-wide text-ink-muted">Leasing (μηνιαίο)</p>
+              <PriceRangeSlider
+                minValue={draft.monthlyPriceMin}
+                maxValue={draft.monthlyPriceMax}
+                onCommit={(min, max) => setDraft((prev) => ({ ...prev, monthlyPriceMin: min, monthlyPriceMax: max }))}
+                rangeMin={VEHICLE_MONTHLY_PRICE_FILTER_MIN}
+                rangeMax={VEHICLE_MONTHLY_PRICE_FILTER_MAX}
+                rangeStep={VEHICLE_MONTHLY_PRICE_FILTER_STEP}
+                minAriaLabel="Ελάχιστη μηνιαία τιμή"
+                maxAriaLabel="Μέγιστη μηνιαία τιμή"
+              />
+            </div>
           </AccordionContent>
         </AccordionItem>
 
@@ -307,20 +331,35 @@ export function VehicleFilters({ options }: { options: VehicleFilterOptions }) {
                   </button>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {makerGroups.map(([letter, makers]) => (
                     <div key={letter} className="space-y-1.5">
-                      <p className="text-xs font-bold text-primary">{letter}</p>
-                      <div className="space-y-2">
-                        {makers.map((maker) => (
-                          <label key={maker} className="flex items-center gap-2 text-sm text-[#1a1a1a]">
-                            <Checkbox
-                              checked={selectedMakers.includes(maker)}
-                              onCheckedChange={() => setCsvParam("maker", maker)}
-                            />
-                            <span>{maker}</span>
-                          </label>
-                        ))}
+                      <div className="flex items-center gap-2.5">
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-primary/10 text-[11px] font-bold tracking-wide text-primary">
+                          {letter}
+                        </span>
+                        <div className="h-px flex-1 bg-border/70" />
+                      </div>
+                      <div className="space-y-0.5">
+                        {makers.map((maker) => {
+                          const checked = selectedMakers.includes(maker);
+                          return (
+                            <label
+                              key={maker}
+                              className={cn(
+                                "flex cursor-pointer items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-sm transition-colors",
+                                checked ? "bg-primary/[0.06] font-semibold text-primary" : "text-[#1a1a1a] hover:bg-surface",
+                              )}
+                            >
+                              <Checkbox
+                                checked={checked}
+                                onCheckedChange={() => setCsvParam("maker", maker)}
+                              />
+                              <MakerBadge maker={maker} size={26} />
+                              <span className="flex-1 truncate">{maker}</span>
+                            </label>
+                          );
+                        })}
                       </div>
                     </div>
                   ))}

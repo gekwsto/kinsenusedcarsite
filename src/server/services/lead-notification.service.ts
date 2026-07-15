@@ -50,16 +50,25 @@ interface EmailContent {
 function htmlShell(title: string, bodyHtml: string): string {
   return `<!doctype html>
 <html lang="el">
-  <body style="margin:0;padding:0;background:#f5f9fc;font-family:Arial,Helvetica,sans-serif;color:#1f2933;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5f9fc;padding:24px 0;">
+  <body style="margin:0;padding:0;background:#eef3f7;font-family:Arial,Helvetica,sans-serif;color:#1f2933;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef3f7;padding:32px 16px;">
       <tr>
         <td align="center">
-          <table role="presentation" width="100%" style="max-width:560px;background:#ffffff;border-radius:12px;border:1px solid #e2e8f0;" cellpadding="0" cellspacing="0">
+          <table role="presentation" width="100%" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;" cellpadding="0" cellspacing="0">
             <tr>
-              <td style="padding:28px 32px;">
-                <p style="margin:0 0 20px;font-size:18px;font-weight:bold;color:#023859;">Kinsen</p>
-                <h1 style="margin:0 0 16px;font-size:18px;color:#023859;">${escapeHtml(title)}</h1>
+              <td style="background:#023859;padding:22px 32px;">
+                <p style="margin:0;font-size:19px;font-weight:bold;letter-spacing:0.03em;color:#ffffff;">KINSEN</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:32px;">
+                <h1 style="margin:0 0 18px;font-size:19px;color:#023859;">${escapeHtml(title)}</h1>
                 ${bodyHtml}
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#f5f9fc;padding:16px 32px;border-top:1px solid #e2e8f0;">
+                <p style="margin:0;font-size:11px;color:#94a3b8;text-align:center;">Kinsen Hellas &middot; ${new Date().getFullYear()}</p>
               </td>
             </tr>
           </table>
@@ -104,19 +113,20 @@ export function buildCustomerConfirmationEmail(lead: LeadWithVehicle, settings: 
     "Λάβαμε το ενδιαφέρον σας",
     [
       `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Γεια σας <strong>${escapeHtml(lead.firstName)}</strong>,</p>`,
-      `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Λάβαμε το αίτημά σας ενδιαφέροντος για <strong>${escapeHtml(interestLabel)}</strong>${
+      `<p style="margin:0 0 20px;font-size:15px;line-height:1.6;">Λάβαμε το αίτημά σας ενδιαφέροντος για <strong>${escapeHtml(interestLabel)}</strong>${
         vehicleLine ? ` σχετικά με το όχημα <strong>${escapeHtml(vehicleLine)}</strong>` : ""
       }.</p>`,
-      `<p style="margin:0 0 20px;font-size:15px;line-height:1.6;">Ένας εκπρόσωπος της Kinsen θα επικοινωνήσει μαζί σας σύντομα.</p>`,
+      `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 24px;background:#f0f9fa;border-radius:10px;"><tr><td style="padding:14px 18px;font-size:14px;line-height:1.5;color:#023859;">Ένας εκπρόσωπος της Kinsen θα επικοινωνήσει μαζί σας σύντομα.</td></tr></table>`,
       publicUrl
-        ? `<p style="margin:0 0 20px;"><a href="${escapeHtml(publicUrl)}" style="color:#00899a;font-weight:bold;text-decoration:none;">Δείτε το όχημα &rarr;</a></p>`
+        ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 28px;"><tr><td style="border-radius:8px;background:#00899a;"><a href="${escapeHtml(publicUrl)}" style="display:inline-block;padding:12px 26px;font-size:14px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:8px;">Δείτε το όχημα &rarr;</a></td></tr></table>`
         : "",
-      `<hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0;" />`,
-      `<p style="margin:0 0 4px;font-size:13px;color:#52616f;">Στοιχεία επικοινωνίας Kinsen</p>`,
-      `<p style="margin:0 0 2px;font-size:13px;color:#52616f;">${escapeHtml(settings.contactPhone)}</p>`,
-      `<p style="margin:0 0 2px;font-size:13px;color:#52616f;">${escapeHtml(settings.contactEmail)}</p>`,
-      `<p style="margin:0 0 16px;font-size:13px;color:#52616f;">${escapeHtml(settings.address)}</p>`,
-      `<p style="margin:0;font-size:11px;color:#9aa5b1;">Αυτό είναι ένα αυτοματοποιημένο μήνυμα, δεν χρειάζεται απάντηση. Τα στοιχεία σας χρησιμοποιούνται αποκλειστικά για την εξυπηρέτηση του αιτήματός σας.</p>`,
+      `<p style="margin:0 0 10px;font-size:11px;font-weight:bold;letter-spacing:0.04em;text-transform:uppercase;color:#94a3b8;">Στοιχεία επικοινωνίας</p>`,
+      `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 24px;">`,
+      `<tr><td style="padding:3px 0;font-size:13px;color:#52616f;">${escapeHtml(settings.contactPhone)}</td></tr>`,
+      `<tr><td style="padding:3px 0;font-size:13px;color:#52616f;">${escapeHtml(settings.contactEmail)}</td></tr>`,
+      `<tr><td style="padding:3px 0;font-size:13px;color:#52616f;">${escapeHtml(settings.address)}</td></tr>`,
+      `</table>`,
+      `<p style="margin:0;padding-top:16px;border-top:1px solid #e2e8f0;font-size:11px;line-height:1.5;color:#9aa5b1;">Αυτό είναι ένα αυτοματοποιημένο μήνυμα, δεν χρειάζεται απάντηση. Τα στοιχεία σας χρησιμοποιούνται αποκλειστικά για την εξυπηρέτηση του αιτήματός σας.</p>`,
     ].join("\n"),
   );
 

@@ -27,6 +27,11 @@ export function PriceRangeSlider({
   minValue,
   maxValue,
   onCommit,
+  rangeMin = VEHICLE_PRICE_FILTER_MIN,
+  rangeMax = VEHICLE_PRICE_FILTER_MAX,
+  rangeStep = VEHICLE_PRICE_FILTER_STEP,
+  minAriaLabel = "Ελάχιστη τιμή",
+  maxAriaLabel = "Μέγιστη τιμή",
 }: {
   /** Draft string value, empty string meaning "at the default bound". */
   minValue: string;
@@ -34,15 +39,25 @@ export function PriceRangeSlider({
   /**
    * Fired once the interaction settles (pointer release, or a committed
    * keyboard step) — never on every drag pixel. A thumb sitting exactly on
-   * its default bound (0 for min, 50.000 for max) is reported back as an
-   * empty string, matching how every other numeric filter field already
-   * represents "not set" (see EMPTY_DRAFT in vehicle-filter-provider.tsx),
-   * so no separate default-omission logic is needed anywhere downstream.
+   * its default bound (`rangeMin` for min, `rangeMax` for max) is reported
+   * back as an empty string, matching how every other numeric filter field
+   * already represents "not set" (see EMPTY_DRAFT in
+   * vehicle-filter-provider.tsx), so no separate default-omission logic is
+   * needed anywhere downstream.
    */
   onCommit: (min: string, max: string) => void;
+  /** Defaults to the purchase-price bounds; pass the Leasing/monthly-price
+   * bounds (VEHICLE_MONTHLY_PRICE_FILTER_MIN/MAX/STEP) to reuse this same
+   * slider for the "rent" filter instead of duplicating its drag/commit
+   * logic. */
+  rangeMin?: number;
+  rangeMax?: number;
+  rangeStep?: number;
+  minAriaLabel?: string;
+  maxAriaLabel?: string;
 }) {
-  const committedMin = minValue ? Number(minValue) : VEHICLE_PRICE_FILTER_MIN;
-  const committedMax = maxValue ? Number(maxValue) : VEHICLE_PRICE_FILTER_MAX;
+  const committedMin = minValue ? Number(minValue) : rangeMin;
+  const committedMax = maxValue ? Number(maxValue) : rangeMax;
 
   // Local drag draft — updates on every native input event (immediate
   // visual feedback), independent of the canonical filter draft.
@@ -84,11 +99,11 @@ export function PriceRangeSlider({
 
   const commitLatest = () => {
     const { min, max } = latestRef.current;
-    onCommit(toDraftValue(min, VEHICLE_PRICE_FILTER_MIN), toDraftValue(max, VEHICLE_PRICE_FILTER_MAX));
+    onCommit(toDraftValue(min, rangeMin), toDraftValue(max, rangeMax));
   };
 
-  const rangeStartPercent = (localMin / VEHICLE_PRICE_FILTER_MAX) * 100;
-  const rangeEndPercent = (localMax / VEHICLE_PRICE_FILTER_MAX) * 100;
+  const rangeStartPercent = (localMin / rangeMax) * 100;
+  const rangeEndPercent = (localMax / rangeMax) * 100;
 
   return (
     <div className="space-y-2.5">
@@ -109,11 +124,11 @@ export function PriceRangeSlider({
         />
         <input
           type="range"
-          min={VEHICLE_PRICE_FILTER_MIN}
-          max={VEHICLE_PRICE_FILTER_MAX}
-          step={VEHICLE_PRICE_FILTER_STEP}
+          min={rangeMin}
+          max={rangeMax}
+          step={rangeStep}
           value={localMin}
-          aria-label="Ελάχιστη τιμή"
+          aria-label={minAriaLabel}
           aria-valuetext={formatEuro(localMin)}
           onChange={(e) => {
             // Clamp to the other thumb's current value rather than letting
@@ -129,11 +144,11 @@ export function PriceRangeSlider({
         />
         <input
           type="range"
-          min={VEHICLE_PRICE_FILTER_MIN}
-          max={VEHICLE_PRICE_FILTER_MAX}
-          step={VEHICLE_PRICE_FILTER_STEP}
+          min={rangeMin}
+          max={rangeMax}
+          step={rangeStep}
           value={localMax}
-          aria-label="Μέγιστη τιμή"
+          aria-label={maxAriaLabel}
           aria-valuetext={formatEuro(localMax)}
           onChange={(e) => {
             setLocalMax(Math.max(Number(e.currentTarget.value), localMin));

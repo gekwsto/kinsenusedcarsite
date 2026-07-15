@@ -82,6 +82,15 @@ export const VEHICLE_PRICE_FILTER_MIN = 0;
 export const VEHICLE_PRICE_FILTER_MAX = 50_000;
 export const VEHICLE_PRICE_FILTER_STEP = 500;
 
+// Same centralized-range contract as the purchase-price bounds above, for
+// the Leasing (monthly/"rent") price slider — filters `Vehicle.monthlyPrice`
+// rather than `Vehicle.price`. Current data sits between 189-469; 1000 gives
+// real headroom for pricier leasing vehicles without offering a range the
+// server would clamp differently.
+export const VEHICLE_MONTHLY_PRICE_FILTER_MIN = 0;
+export const VEHICLE_MONTHLY_PRICE_FILTER_MAX = 1_000;
+export const VEHICLE_MONTHLY_PRICE_FILTER_STEP = 25;
+
 // Single source of truth for the year/mileage/cc/hp dropdown option
 // boundaries (src/components/vehicles/numeric-range-select.tsx, fed via
 // createNumericRange in src/lib/numeric-range.ts). Unlike
@@ -103,11 +112,16 @@ function clampPrice(value: number | undefined): number | undefined {
   return Math.min(VEHICLE_PRICE_FILTER_MAX, Math.max(VEHICLE_PRICE_FILTER_MIN, value));
 }
 
+function clampMonthlyPrice(value: number | undefined): number | undefined {
+  if (value === undefined) return undefined;
+  return Math.min(VEHICLE_MONTHLY_PRICE_FILTER_MAX, Math.max(VEHICLE_MONTHLY_PRICE_FILTER_MIN, value));
+}
+
 export const vehicleFilterSchema = z.object({
   priceMin: z.coerce.number().optional().transform(clampPrice),
   priceMax: z.coerce.number().optional().transform(clampPrice),
-  monthlyPriceMin: z.coerce.number().optional(),
-  monthlyPriceMax: z.coerce.number().optional(),
+  monthlyPriceMin: z.coerce.number().optional().transform(clampMonthlyPrice),
+  monthlyPriceMax: z.coerce.number().optional().transform(clampMonthlyPrice),
   maker: z.string().optional(),
   model: z.string().optional(),
   yearMin: z.coerce.number().optional(),
