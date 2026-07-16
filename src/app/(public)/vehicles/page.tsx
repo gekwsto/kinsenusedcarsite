@@ -8,6 +8,7 @@ import { Pagination } from "@/components/vehicles/pagination";
 import { VehicleResultsEndMessage } from "@/components/vehicles/vehicle-results-end-message";
 import { VehicleResultsToolbar } from "@/components/vehicles/vehicle-results-toolbar";
 import { VehicleFilterProvider } from "@/components/providers/vehicle-filter-provider";
+import { computeDraftFromParams, draftsEqual, EMPTY_DRAFT } from "@/lib/vehicle-filter-draft";
 import { vehicleFilterSchema } from "@/lib/validators/vehicle.schema";
 import { listPublicVehicles, getPublicFilterOptions } from "@/server/services/vehicle.service";
 import { resolveVehicleImagesForList } from "@/server/services/vehicle-image.service";
@@ -32,8 +33,14 @@ function flattenSearchParams(searchParams: SearchParams): Record<string, string>
 
 export default async function VehiclesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const rawSearchParams = await searchParams;
-  const parsed = vehicleFilterSchema.safeParse(flattenSearchParams(rawSearchParams));
+  const flatSearchParams = flattenSearchParams(rawSearchParams);
+  const parsed = vehicleFilterSchema.safeParse(flatSearchParams);
   const filters = parsed.success ? parsed.data : vehicleFilterSchema.parse({});
+  // Same sidebar-filter fields (maker/fuel/price range/etc.) the client-side
+  // VehicleFilterProvider checks for its own `hasActiveFilters` — computed
+  // here too so the toolbar's "no filters yet" label can render server-side
+  // without waiting on that client context.
+  const hasActiveFilters = !draftsEqual(computeDraftFromParams(new URLSearchParams(flatSearchParams)), EMPTY_DRAFT);
 
   const [{ items, page, totalPages, total }, filterOptions] = await Promise.all([
     listPublicVehicles(filters),
@@ -59,7 +66,7 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
           <VehicleFilters options={filterOptions} />
 
           <div className="min-w-0">
-            <VehicleResultsToolbar totalResults={total} currentSort={filters.sort} />
+            <VehicleResultsToolbar totalResults={total} currentSort={filters.sort} hasActiveFilters={hasActiveFilters} />
             {resolvedItems.length > 0 ? (
               <>
                 <VehicleGrid vehicles={resolvedItems} cardVariant="listing" />

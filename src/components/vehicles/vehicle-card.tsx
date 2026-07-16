@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { NavigationLink as Link } from "@/components/navigation/navigation-link";
-import { Gauge, Cog as EngineIcon, Fuel } from "lucide-react";
+import { Gauge, Cog as EngineIcon, Fuel, Sparkles } from "lucide-react";
 import { FavoriteButton } from "@/components/vehicles/favorite-button";
 import { VehicleCompareToggle } from "@/components/vehicles/vehicle-compare-toggle";
 import { Badge } from "@/components/ui/badge";
@@ -126,7 +126,10 @@ export function VehicleCard({
           className="object-contain transition-transform duration-300 group-hover:scale-105"
         />
         {vehicle.offer && (
-          <Badge className="absolute left-2.5 top-2.5 bg-offer font-normal text-white">Προσφορά</Badge>
+          <Badge className="absolute left-2.5 top-2.5 gap-1 bg-offer font-normal text-white">
+            <Sparkles className="h-3 w-3 shrink-0" />
+            Προσφορά
+          </Badge>
         )}
       </Link>
 
@@ -145,8 +148,8 @@ export function VehicleCard({
           <ul className="mt-3 flex w-full items-center justify-center gap-4 border-t border-border pt-3 text-xs text-ink-muted">
             {stats.map(({ icon: Icon, label }) => (
               <li key={label} className="flex items-center gap-1.5">
-                <Icon className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">{label}</span>
+                <Icon className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} />
+                <span className="truncate font-semibold text-ink">{label}</span>
               </li>
             ))}
           </ul>
