@@ -1,7 +1,24 @@
 "use client";
 
 import * as React from "react";
-import { Search, SlidersHorizontal, Trash2, X } from "lucide-react";
+import {
+  Search,
+  SlidersHorizontal,
+  Trash2,
+  X,
+  Euro,
+  Factory,
+  Calendar,
+  Gauge,
+  Fuel,
+  Cog,
+  Zap,
+  Settings2,
+  Palette,
+  Car,
+  Percent,
+  type LucideIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -91,6 +108,79 @@ function makerGroupLetter(value: string): string {
 type VehicleFilterSection = "price" | "maker" | "year" | "km" | "fuel" | "cc" | "hp" | "transmissionType" | "color" | "typeOfCar" | "offers";
 
 const ALL_SECTIONS: VehicleFilterSection[] = ["price", "maker", "year", "km", "fuel", "cc", "hp", "transmissionType", "color", "typeOfCar", "offers"];
+
+// One fixed icon per section — purely decorative chrome for the panel's own
+// (code-defined, never database-driven) category labels above. This is a
+// different kind of mapping than resolveFuelIcon/resolveVehicleTypeIcon in
+// filter-option-metadata.ts: those resolve icons for open-ended *values*
+// that come from the database (a maker name, a color, a fuel string) and
+// therefore need a graceful fallback for anything unmapped. The eleven
+// sections here are a closed, hardcoded set (ALL_SECTIONS, immediately
+// above) that only changes when this file itself changes — so a plain
+// 1:1 map with no fallback is safe and can never go stale against real data.
+const SECTION_ICON_MAP: Record<VehicleFilterSection, LucideIcon> = {
+  price: Euro,
+  maker: Factory,
+  year: Calendar,
+  km: Gauge,
+  fuel: Fuel,
+  cc: Cog,
+  hp: Zap,
+  transmissionType: Settings2,
+  color: Palette,
+  typeOfCar: Car,
+  offers: Percent,
+};
+
+// Shared row chrome for every AccordionItem in the panel — rounded,
+// spaced rows with a soft tint while open, replacing the previous flat
+// full-bleed `border-b` divider list every section shared identically.
+const ITEM_CLASS = "rounded-xl border-b-0 transition-colors duration-150 hover:bg-surface/60 data-[state=open]:bg-filterHeading/[0.05]";
+
+// Premium manufacturer tile — replaces the old compact checkbox row with a
+// large, centered logo (56px, well above the old 34px circle) so the brand
+// is legible at a glance on any screen size. The real Radix `<Checkbox>` is
+// still present (never removed, so keyboard/ARIA selection semantics are
+// unchanged) — just shrunk and moved into the tile's corner as a selection
+// badge instead of a leading inline square.
+function MakerTile({ maker, checked, onToggle }: { maker: string; checked: boolean; onToggle: () => void }) {
+  return (
+    <label
+      className={cn(
+        "group relative flex cursor-pointer flex-col items-center gap-2 rounded-xl border px-2 py-3 text-center transition-all duration-150",
+        checked
+          ? "border-primary bg-primary/[0.06] shadow-soft"
+          : "border-border/70 bg-white hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-soft",
+      )}
+    >
+      <Checkbox
+        checked={checked}
+        onCheckedChange={onToggle}
+        className="absolute right-1.5 top-1.5 h-4 w-4 bg-white/90"
+      />
+      <MakerBadge maker={maker} size={56} className="shadow-lg transition-transform duration-150 group-hover:scale-110" />
+      <span className={cn("line-clamp-2 text-xs leading-tight", checked ? "font-bold text-primary" : "font-medium text-[#1a1a1a]")}>
+        {maker}
+      </span>
+    </label>
+  );
+}
+
+// Icon chip + label + active-filter dot, shared by every accordion
+// trigger below. `group-data-[state=open]` reads the Radix Trigger's own
+// data-state (see ui/accordion.tsx's `group` class) — no separate
+// React-level "is this section open" bookkeeping needed just for this.
+function FilterSectionHeading({ icon: Icon, label, active }: { icon: LucideIcon; label: string; active: boolean }) {
+  return (
+    <span className="flex flex-1 items-center gap-3">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-filterHeading/10 text-filterHeading transition-colors duration-150 group-data-[state=open]:bg-filterHeading group-data-[state=open]:text-white">
+        <Icon className="h-4 w-4" aria-hidden="true" />
+      </span>
+      <span className="flex-1">{label}</span>
+      {active && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-filterHeading" aria-hidden="true" />}
+    </span>
+  );
+}
 
 // Maps every canonical numeric/csv field that has a rendered control to the
 // section that owns it. `monthlyPriceMin`/`monthlyPriceMax` share the
@@ -265,7 +355,12 @@ export function VehicleFilters({ options }: { options: VehicleFilterOptions }) {
   // `aside` markup further down).
   const filterHeader = (
     <div className="border-b border-border pb-3">
-      <h2 className="text-2xl font-bold leading-tight text-primary">Φίλτρα</h2>
+      <div className="flex items-center gap-2.5">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-filterHeading/10 text-filterHeading">
+          <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+        </span>
+        <h2 className="text-2xl font-bold leading-tight text-primary">Φίλτρα</h2>
+      </div>
       <ActiveFiltersBox chips={activeChips} onRemoveChip={handleChipRemove} onClearAll={clearFilters} />
     </div>
   );
@@ -273,9 +368,11 @@ export function VehicleFilters({ options }: { options: VehicleFilterOptions }) {
   const filterCategories = (
     <div className="space-y-1">
       <Accordion type="multiple" value={openSections} onValueChange={setOpenSections}>
-        <AccordionItem value="price">
-          <AccordionTrigger className={TRIGGER_CLASS}>Τιμή</AccordionTrigger>
-          <AccordionContent className="space-y-5">
+        <AccordionItem value="price" className={ITEM_CLASS}>
+          <AccordionTrigger className={TRIGGER_CLASS}>
+            <FilterSectionHeading icon={SECTION_ICON_MAP.price} label="Τιμή" active={activeSections.has("price")} />
+          </AccordionTrigger>
+          <AccordionContent className="space-y-5 px-2">
             <div className="space-y-2">
               <p className="text-xs font-bold uppercase tracking-wide text-ink-muted">Αγορά</p>
               <PriceRangeSlider
@@ -301,9 +398,11 @@ export function VehicleFilters({ options }: { options: VehicleFilterOptions }) {
         </AccordionItem>
 
         {options.makers.length > 0 && (
-          <AccordionItem value="maker">
-            <AccordionTrigger className={TRIGGER_CLASS}>Κατασκευαστής</AccordionTrigger>
-            <AccordionContent className="space-y-3">
+          <AccordionItem value="maker" className={ITEM_CLASS}>
+            <AccordionTrigger className={TRIGGER_CLASS}>
+              <FilterSectionHeading icon={SECTION_ICON_MAP.maker} label="Κατασκευαστής" active={activeSections.has("maker")} />
+            </AccordionTrigger>
+            <AccordionContent className="space-y-3 px-2">
               <div className="relative">
                 <Label htmlFor="maker-search" className="sr-only">
                   Αναζήτηση κατασκευαστή
@@ -340,26 +439,15 @@ export function VehicleFilters({ options }: { options: VehicleFilterOptions }) {
                         </span>
                         <div className="h-px flex-1 bg-border/70" />
                       </div>
-                      <div className="space-y-0.5">
-                        {makers.map((maker) => {
-                          const checked = selectedMakers.includes(maker);
-                          return (
-                            <label
-                              key={maker}
-                              className={cn(
-                                "flex cursor-pointer items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-sm transition-colors",
-                                checked ? "bg-primary/[0.06] font-semibold text-primary" : "text-[#1a1a1a] hover:bg-surface",
-                              )}
-                            >
-                              <Checkbox
-                                checked={checked}
-                                onCheckedChange={() => setCsvParam("maker", maker)}
-                              />
-                              <MakerBadge maker={maker} size={26} />
-                              <span className="flex-1 truncate">{maker}</span>
-                            </label>
-                          );
-                        })}
+                      <div className="grid grid-cols-[repeat(auto-fill,minmax(84px,1fr))] gap-2">
+                        {makers.map((maker) => (
+                          <MakerTile
+                            key={maker}
+                            maker={maker}
+                            checked={selectedMakers.includes(maker)}
+                            onToggle={() => setCsvParam("maker", maker)}
+                          />
+                        ))}
                       </div>
                     </div>
                   ))}
@@ -369,9 +457,11 @@ export function VehicleFilters({ options }: { options: VehicleFilterOptions }) {
           </AccordionItem>
         )}
 
-        <AccordionItem value="year">
-          <AccordionTrigger className={TRIGGER_CLASS}>Χρονολογία</AccordionTrigger>
-          <AccordionContent>
+        <AccordionItem value="year" className={ITEM_CLASS}>
+          <AccordionTrigger className={TRIGGER_CLASS}>
+            <FilterSectionHeading icon={SECTION_ICON_MAP.year} label="Χρονολογία" active={activeSections.has("year")} />
+          </AccordionTrigger>
+          <AccordionContent className="px-2">
             <NumericRangeSelect
               options={YEAR_OPTIONS}
               minValue={draft.yearMin}
@@ -387,9 +477,11 @@ export function VehicleFilters({ options }: { options: VehicleFilterOptions }) {
           </AccordionContent>
         </AccordionItem>
 
-        <AccordionItem value="km">
-          <AccordionTrigger className={TRIGGER_CLASS}>Χιλιόμετρα</AccordionTrigger>
-          <AccordionContent>
+        <AccordionItem value="km" className={ITEM_CLASS}>
+          <AccordionTrigger className={TRIGGER_CLASS}>
+            <FilterSectionHeading icon={SECTION_ICON_MAP.km} label="Χιλιόμετρα" active={activeSections.has("km")} />
+          </AccordionTrigger>
+          <AccordionContent className="px-2">
             <NumericRangeSelect
               options={MILEAGE_OPTIONS}
               minValue={draft.kmMin}
@@ -406,9 +498,11 @@ export function VehicleFilters({ options }: { options: VehicleFilterOptions }) {
         </AccordionItem>
 
         {options.fuels.length > 0 && (
-          <AccordionItem value="fuel">
-            <AccordionTrigger className={TRIGGER_CLASS}>Καύσιμο</AccordionTrigger>
-            <AccordionContent>
+          <AccordionItem value="fuel" className={ITEM_CLASS}>
+            <AccordionTrigger className={TRIGGER_CLASS}>
+              <FilterSectionHeading icon={SECTION_ICON_MAP.fuel} label="Καύσιμο" active={activeSections.has("fuel")} />
+            </AccordionTrigger>
+            <AccordionContent className="px-2">
               <div className="flex flex-col gap-2">
                 {options.fuels.map((value) => (
                   <FilterToggleButton
@@ -424,9 +518,11 @@ export function VehicleFilters({ options }: { options: VehicleFilterOptions }) {
           </AccordionItem>
         )}
 
-        <AccordionItem value="cc">
-          <AccordionTrigger className={TRIGGER_CLASS}>Κυβικά (cc)</AccordionTrigger>
-          <AccordionContent>
+        <AccordionItem value="cc" className={ITEM_CLASS}>
+          <AccordionTrigger className={TRIGGER_CLASS}>
+            <FilterSectionHeading icon={SECTION_ICON_MAP.cc} label="Κυβικά (cc)" active={activeSections.has("cc")} />
+          </AccordionTrigger>
+          <AccordionContent className="px-2">
             <NumericRangeSelect
               options={CC_OPTIONS}
               minValue={draft.ccMin}
@@ -442,9 +538,11 @@ export function VehicleFilters({ options }: { options: VehicleFilterOptions }) {
           </AccordionContent>
         </AccordionItem>
 
-        <AccordionItem value="hp">
-          <AccordionTrigger className={TRIGGER_CLASS}>Ιπποδύναμη (Bhp)</AccordionTrigger>
-          <AccordionContent>
+        <AccordionItem value="hp" className={ITEM_CLASS}>
+          <AccordionTrigger className={TRIGGER_CLASS}>
+            <FilterSectionHeading icon={SECTION_ICON_MAP.hp} label="Ιπποδύναμη (Bhp)" active={activeSections.has("hp")} />
+          </AccordionTrigger>
+          <AccordionContent className="px-2">
             <NumericRangeSelect
               options={HP_OPTIONS}
               minValue={draft.hpMin}
@@ -461,9 +559,11 @@ export function VehicleFilters({ options }: { options: VehicleFilterOptions }) {
         </AccordionItem>
 
         {options.transmissions.length > 0 && (
-          <AccordionItem value="transmissionType">
-            <AccordionTrigger className={TRIGGER_CLASS}>Κιβώτιο Ταχυτήτων</AccordionTrigger>
-            <AccordionContent>
+          <AccordionItem value="transmissionType" className={ITEM_CLASS}>
+            <AccordionTrigger className={TRIGGER_CLASS}>
+              <FilterSectionHeading icon={SECTION_ICON_MAP.transmissionType} label="Κιβώτιο Ταχυτήτων" active={activeSections.has("transmissionType")} />
+            </AccordionTrigger>
+            <AccordionContent className="px-2">
               <div className="flex flex-col gap-2">
                 {options.transmissions.map((value) => (
                   <FilterToggleButton
@@ -480,9 +580,11 @@ export function VehicleFilters({ options }: { options: VehicleFilterOptions }) {
         )}
 
         {options.colors.length > 0 && (
-          <AccordionItem value="color">
-            <AccordionTrigger className={TRIGGER_CLASS}>Χρώμα</AccordionTrigger>
-            <AccordionContent className="space-y-3">
+          <AccordionItem value="color" className={ITEM_CLASS}>
+            <AccordionTrigger className={TRIGGER_CLASS}>
+              <FilterSectionHeading icon={SECTION_ICON_MAP.color} label="Χρώμα" active={activeSections.has("color")} />
+            </AccordionTrigger>
+            <AccordionContent className="space-y-3 px-2">
               <div className="relative">
                 <Label htmlFor="color-search" className="sr-only">
                   Αναζήτηση χρώματος
@@ -534,9 +636,11 @@ export function VehicleFilters({ options }: { options: VehicleFilterOptions }) {
         )}
 
         {options.typesOfCar.length > 0 && (
-          <AccordionItem value="typeOfCar">
-            <AccordionTrigger className={TRIGGER_CLASS}>Τύπος Αυτοκινήτου</AccordionTrigger>
-            <AccordionContent>
+          <AccordionItem value="typeOfCar" className={ITEM_CLASS}>
+            <AccordionTrigger className={TRIGGER_CLASS}>
+              <FilterSectionHeading icon={SECTION_ICON_MAP.typeOfCar} label="Τύπος Αυτοκινήτου" active={activeSections.has("typeOfCar")} />
+            </AccordionTrigger>
+            <AccordionContent className="px-2">
               <div className="flex flex-col gap-2">
                 {options.typesOfCar.map((value) => (
                   <FilterToggleButton
@@ -553,9 +657,11 @@ export function VehicleFilters({ options }: { options: VehicleFilterOptions }) {
         )}
 
         {options.hasOffers && (
-          <AccordionItem value="offers">
-            <AccordionTrigger className={TRIGGER_CLASS}>Προσφορές</AccordionTrigger>
-            <AccordionContent>
+          <AccordionItem value="offers" className={ITEM_CLASS}>
+            <AccordionTrigger className={TRIGGER_CLASS}>
+              <FilterSectionHeading icon={SECTION_ICON_MAP.offers} label="Προσφορές" active={activeSections.has("offers")} />
+            </AccordionTrigger>
+            <AccordionContent className="px-2">
               <FilterToggleButton
                 label="Deals"
                 icon={DEALS_ICON}
@@ -601,7 +707,11 @@ export function VehicleFilters({ options }: { options: VehicleFilterOptions }) {
       </div>
 
       <aside className="hidden shrink-0 lg:sticky lg:top-[var(--kinsen-header-offset)] lg:block lg:self-start">
-        <div className="flex max-h-[calc(100dvh_-_var(--kinsen-header-offset)_-_2rem)] flex-col rounded-card border border-border bg-white shadow-soft">
+        <div className="relative flex max-h-[calc(100dvh_-_var(--kinsen-header-offset)_-_2rem)] flex-col overflow-hidden rounded-card border border-border bg-white shadow-soft">
+          {/* Same "soft ambient accent" top hairline already used on the
+              footer (footer.tsx) — reuses that established motif instead
+              of inventing a new one for this panel. */}
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-transparent via-accent/70 to-transparent" />
           <div className="shrink-0 px-4 pt-4">{filterHeader}</div>
           <div className="vehicle-filters-scroll min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-3">
             {filterCategories}
@@ -630,13 +740,13 @@ function ActiveFiltersBox({
   if (chips.length === 0) return null;
 
   return (
-    <div className="kinsen-active-filters-box mt-2.5 rounded-lg border border-border bg-surface px-3 py-2.5">
+    <div className="kinsen-active-filters-box mt-2.5 rounded-lg border border-filterHeading/15 bg-filterHeading/[0.05] px-3 py-2.5">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="text-xs font-semibold text-primary">Ενεργά φίλτρα: {chips.length}</span>
+        <span className="text-xs font-semibold text-filterHeading">Ενεργά φίλτρα: {chips.length}</span>
         <button
           type="button"
           onClick={onClearAll}
-          className="flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-xs font-semibold text-primary hover:bg-primary/10"
+          className="flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-xs font-semibold text-filterHeading hover:bg-filterHeading/10"
         >
           <Trash2 className="h-3.5 w-3.5" /> Καθαρισμός όλων
         </button>
@@ -645,14 +755,14 @@ function ActiveFiltersBox({
         {chips.map((chip) => (
           <span
             key={chip.id}
-            className="inline-flex items-center gap-1 rounded-full border border-border bg-white py-1 pl-2.5 pr-1 text-xs text-ink"
+            className="inline-flex items-center gap-1 rounded-full border border-filterHeading/20 bg-white py-1 pl-2.5 pr-1 text-xs text-ink shadow-sm"
           >
             {chip.label}
             <button
               type="button"
               onClick={() => onRemoveChip(chip)}
               aria-label={chip.ariaLabel}
-              className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-ink-muted hover:bg-border/60 hover:text-ink"
+              className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-ink-muted hover:bg-filterHeading/10 hover:text-filterHeading"
             >
               <X className="h-3 w-3" />
             </button>

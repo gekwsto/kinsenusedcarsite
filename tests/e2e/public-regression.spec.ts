@@ -65,7 +65,7 @@ test.describe("navigation regression", () => {
   test("footer remains interactive after a consent choice", async ({ page }) => {
     await page.goto("/");
     await bannerLocators(page).rejectButton.click();
-    const kinsenLink = page.locator("footer").getByRole("link", { name: /Μπείτε στη σελίδα της Kinsen/ });
+    const kinsenLink = page.locator("footer").getByRole("link", { name: "Η Kinsen" });
     await expect(kinsenLink).toBeVisible();
   });
 });

@@ -3,33 +3,49 @@
 import { cn } from "@/lib/utils";
 
 // Every known maker's logo lives at /public/images/brands/<slug>.svg —
-// small, current-era official marks sourced individually from Wikimedia
-// Commons (each file's own source URL is documented in the commit that
-// added it). A maker absent from this map (e.g. a brand-new CarStock import
+// current-era official marks sourced from worldvectorlogo.com, rendered
+// large (see MakerTile in vehicle-filters.tsx) so the brand is legible at a
+// glance on any screen size. A maker absent from this map (e.g. a brand-new
+// CarStock import
 // not yet added here) still renders correctly via the deterministic-initials
 // fallback in MakerBadge below — never a broken image, never a blank badge,
 // and zero frontend code changes are required for it to appear at all (see
 // filter-option-metadata.ts for the same "never hide an unmapped value"
 // contract applied to fuel/transmission/vehicle-type).
 const MAKER_LOGO_MAP: Record<string, string> = {
+  "alfa romeo": "/images/brands/alfa-romeo.svg",
+  alfaromeo: "/images/brands/alfa-romeo.svg",
   audi: "/images/brands/audi.svg",
   bmw: "/images/brands/bmw.svg",
+  chevrolet: "/images/brands/chevrolet.svg",
   citroen: "/images/brands/citroen.svg",
+  cupra: "/images/brands/cupra.svg",
   dacia: "/images/brands/dacia.svg",
   fiat: "/images/brands/fiat.svg",
   ford: "/images/brands/ford.svg",
   honda: "/images/brands/honda.svg",
   hyundai: "/images/brands/hyundai.svg",
+  jaguar: "/images/brands/jaguar.svg",
+  jeep: "/images/brands/jeep.svg",
   kia: "/images/brands/kia.svg",
+  "land rover": "/images/brands/land-rover.svg",
+  landrover: "/images/brands/land-rover.svg",
+  lexus: "/images/brands/lexus.svg",
   mazda: "/images/brands/mazda.svg",
   "mercedes-benz": "/images/brands/mercedes-benz.svg",
   mercedes: "/images/brands/mercedes-benz.svg",
+  mini: "/images/brands/mini.svg",
+  mitsubishi: "/images/brands/mitsubishi.svg",
   nissan: "/images/brands/nissan.svg",
   opel: "/images/brands/opel.svg",
   peugeot: "/images/brands/peugeot.svg",
+  porsche: "/images/brands/porsche.svg",
   renault: "/images/brands/renault.svg",
   seat: "/images/brands/seat.svg",
   skoda: "/images/brands/skoda.svg",
+  smart: "/images/brands/smart.svg",
+  subaru: "/images/brands/subaru.svg",
+  tesla: "/images/brands/tesla.svg",
   toyota: "/images/brands/toyota.svg",
   volkswagen: "/images/brands/volkswagen.svg",
   vw: "/images/brands/volkswagen.svg",
@@ -81,14 +97,14 @@ interface MakerBadgeProps {
 // initials badge in a fixed brand-color palette. Same footprint either way,
 // so the filter list never jumps/reflows as real logos get added for more
 // makers over time.
-export function MakerBadge({ maker, size = 26, className }: MakerBadgeProps) {
+export function MakerBadge({ maker, size = 34, className }: MakerBadgeProps) {
   const logoSrc = resolveMakerLogo(maker);
 
   if (logoSrc) {
     return (
       <span
         className={cn(
-          "inline-flex shrink-0 items-center justify-center rounded-full border border-border/60 bg-white p-1 shadow-sm",
+          "inline-flex shrink-0 items-center justify-center rounded-full border border-border/60 bg-white p-1 shadow-md transition-transform duration-150",
           className,
         )}
         style={{ width: size, height: size }}
