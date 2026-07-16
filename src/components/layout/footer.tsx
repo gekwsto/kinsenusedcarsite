@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { Mail, MapPin, Phone } from "lucide-react";
 import { NavigationLink as Link } from "@/components/navigation/navigation-link";
 import { getSiteSettings } from "@/server/services/settings.service";
 import { CookieSettingsButton } from "@/components/layout/cookie-settings-button";
@@ -87,17 +88,31 @@ export async function Footer() {
 
           <FooterColumn title="Επικοινωνία">
             <li className="text-white/75">
-              <a href={mapsHref} target="_blank" rel="noreferrer" className="transition-colors hover:text-accent">
+              <a
+                href={mapsHref}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 transition-colors hover:text-accent"
+              >
+                <MapPin className="size-4 shrink-0" aria-hidden="true" />
                 {settings.address}
               </a>
             </li>
             <li>
-              <a href={`mailto:${settings.contactEmail}`} className="transition-colors hover:text-accent">
+              <a
+                href={`mailto:${settings.contactEmail}`}
+                className="inline-flex items-center gap-2 transition-colors hover:text-accent"
+              >
+                <Mail className="size-4 shrink-0" aria-hidden="true" />
                 {settings.contactEmail}
               </a>
             </li>
             <li>
-              <a href={`tel:${settings.contactPhone.replace(/\s+/g, "")}`} className="transition-colors hover:text-accent">
+              <a
+                href={`tel:${settings.contactPhone.replace(/\s+/g, "")}`}
+                className="inline-flex items-center gap-2 transition-colors hover:text-accent"
+              >
+                <Phone className="size-4 shrink-0" aria-hidden="true" />
                 {settings.contactPhone}
               </a>
             </li>
