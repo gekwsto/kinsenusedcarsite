@@ -172,7 +172,7 @@ export function buildCustomerConfirmationEmail(lead: LeadWithVehicle, settings: 
 
       `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 28px;background:#f0f9fa;border-radius:10px;"><tr><td style="padding:16px 20px;font-size:14px;line-height:1.6;color:#023859;">&#10003;&nbsp;&nbsp;Ένας εκπρόσωπος της Kinsen θα επικοινωνήσει μαζί σας σύντομα.</td></tr></table>`,
       publicUrl
-        ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 32px;"><tr><td style="border-radius:10px;background:#00899a;box-shadow:0 8px 20px rgba(0,137,154,0.28);"><a href="${escapeHtml(publicUrl)}" style="display:inline-block;padding:14px 30px;font-size:14px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:10px;">Δείτε το όχημα &rarr;</a></td></tr></table>`
+        ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 32px;"><tr><td style="border-radius:999px;background:#023859;box-shadow:0 8px 20px rgba(2,56,89,0.35);"><a href="${escapeHtml(publicUrl)}" style="display:inline-block;padding:14px 34px;font-size:14px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:999px;">Δείτε το όχημα &rarr;</a></td></tr></table>`
         : "",
       `<p style="margin:0 0 12px;font-size:11px;font-weight:bold;letter-spacing:0.04em;text-transform:uppercase;color:#94a3b8;">Στοιχεία επικοινωνίας</p>`,
       `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 24px;">`,

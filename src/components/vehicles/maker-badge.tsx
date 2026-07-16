@@ -104,7 +104,7 @@ export function MakerBadge({ maker, size = 34, className }: MakerBadgeProps) {
     return (
       <span
         className={cn(
-          "inline-flex shrink-0 items-center justify-center rounded-full border border-border/60 bg-white p-1 shadow-md transition-transform duration-150",
+          "inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-border/60 bg-white p-1 shadow-md transition-transform duration-150",
           className,
         )}
         style={{ width: size, height: size }}

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { NavigationLink as Link } from "@/components/navigation/navigation-link";
 import { getSiteSettings } from "@/server/services/settings.service";
 import { CookieSettingsButton } from "@/components/layout/cookie-settings-button";
@@ -143,20 +144,23 @@ export async function Footer() {
         </ul>
       </div>
 
-      {/* Purely decorative brand watermark: an oversized "KINSEN" wordmark.
-          No fixed/clamped wrapper height here on purpose — clipping the
-          wrapper shorter than the text cropped off the bottom of the
-          letters at every breakpoint. The wrapper's height now simply
-          follows the text's own natural height, so the full word is always
-          shown, uncropped, at every viewport width. `overflow-hidden` is
-          kept only as a horizontal safety net. A static effect, deliberately
-          with no scroll/parallax animation. aria-hidden + pointer-events-none
+      {/* Purely decorative brand mark — the real Kinsen logo (same asset used
+          in the transactional emails, see logoUrl() in
+          lead-notification.service.ts), replacing the previous oversized
+          "KINSEN" text wordmark. `clamp()` scales it continuously between a
+          mobile floor and a desktop ceiling rather than jumping at fixed
+          breakpoints, so it's correctly sized at every viewport width, not
+          just the ones with an explicit rule. aria-hidden + pointer-events-none
           since it carries no information and must never intercept a click
           meant for real content. */}
-      <div aria-hidden="true" className="pointer-events-none relative select-none overflow-hidden pt-2 pb-4 sm:pb-6">
-        <p className="text-center text-[clamp(2.75rem,10vw,9rem)] font-black leading-none tracking-tight text-white/[0.16]">
-          KINSEN
-        </p>
+      <div aria-hidden="true" className="pointer-events-none relative flex select-none justify-center pt-2 pb-6 sm:pb-8">
+        <Image
+          src="/images/kinsen_logowhite.png"
+          alt=""
+          width={3000}
+          height={701}
+          className="h-auto w-[clamp(11rem,40vw,26rem)] opacity-90"
+        />
       </div>
     </footer>
   );
