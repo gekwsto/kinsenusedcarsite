@@ -1,7 +1,12 @@
 import { z } from "zod";
 import type { ContentKey } from "@/lib/content-defaults";
 
-const heroSchema = z.object({ line1: z.string().min(1), line2: z.string().min(1), image: z.string().min(1) });
+const heroSchema = z.object({
+  line1: z.string().min(1),
+  line2: z.string().min(1),
+  subtitle: z.string().min(1),
+  image: z.string().min(1),
+});
 const statsSchema = z.object({
   heading: z.string().min(1),
   paragraph1: z.string().min(1),

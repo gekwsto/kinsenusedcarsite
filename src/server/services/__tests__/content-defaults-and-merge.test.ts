@@ -9,7 +9,7 @@ import { withDefaults } from "@/server/services/content.service";
 // hardcoded path, and that starts from the exact same path so nothing
 // changes visually until they actually do.
 const IMAGE_DEFAULTS: { key: keyof typeof CONTENT_DEFAULTS; expected: string }[] = [
-  { key: "home.hero", expected: "/images/banner.png" },
+  { key: "home.hero", expected: "/images/homepage_banner.jpg" },
   { key: "financing.hero", expected: "/images/keys.jpg" },
   { key: "warranty.hero", expected: "/images/egguhsh.jpg" },
   { key: "contact.hero", expected: "/images/communication.jpg" },
@@ -39,7 +39,7 @@ test("withDefaults: a null/non-object stored value falls back entirely to defaul
 });
 
 test("withDefaults: a fully-populated stored override is used as-is (admin's real edit is not silently overwritten)", () => {
-  const stored = { line1: "Custom 1", line2: "Custom 2", image: "/uploads/content/home.hero/custom.jpg" };
+  const stored = { line1: "Custom 1", line2: "Custom 2", subtitle: "Custom subtitle", image: "/uploads/content/home.hero/custom.jpg" };
   assert.deepEqual(withDefaults("home.hero", stored), stored);
 });
 

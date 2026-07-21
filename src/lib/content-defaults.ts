@@ -7,6 +7,7 @@
 export interface HeroContent {
   line1: string;
   line2: string;
+  subtitle: string;
   image: string;
 }
 
@@ -54,9 +55,10 @@ export interface InfoCardsContent {
 
 export const CONTENT_DEFAULTS = {
   "home.hero": {
-    line1: "Βρες το επόμενο",
-    line2: "αυτοκίνητό σου",
-    image: "/images/banner.png",
+    line1: "Βρες το αυτοκίνητο",
+    line2: "που σου ταιριάζει",
+    subtitle: "Επιλεγμένα μεταχειρισμένα οχήματα, διαθέσιμα για Αγορά ή Leasing.",
+    image: "/images/homepage_banner.jpg",
   } satisfies HeroContent,
 
   "home.stats": {

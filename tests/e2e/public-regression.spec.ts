@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { attachRuntimeErrorGuard, assertNoRuntimeErrors, bannerLocators } from "./helpers";
+import { attachRuntimeErrorGuard, assertNoRuntimeErrors, bannerLocators, waitForAccordionSettled } from "./helpers";
 
 // Root-provider (CookieConsentProvider/FavoritesProvider) regression —
 // these public-site behaviors were not directly edited by the consent
@@ -70,13 +70,23 @@ test.describe("navigation regression", () => {
   });
 });
 
+// Matches all four grammatical forms VehicleResultsToolbar renders (see
+// src/components/vehicles/vehicle-results-toolbar.tsx): "Αποτελέσματα:" /
+// "Αποτέλεσμα:" only appear once a filter is actively applied — a fresh,
+// unfiltered /vehicles visit (hasActiveFilters === false, the case every
+// test below actually exercises) renders "Όλα τα αποτελέσματα:" / "Όλο το
+// αποτέλεσμα:" instead (lowercase "α", correct Greek mid-sentence casing).
+// Case-insensitive so both the capitalized standalone label and the
+// lowercase mid-sentence form match the same pattern.
+const RESULTS_LABEL_PATTERN = /αποτελέσματα|αποτέλεσμα/i;
+
 test.describe("[40] vehicle listing / filter regression", () => {
   test("route loads, vehicle cards or empty state render, no runtime errors", async ({ page }) => {
     const runtimeGuard = attachRuntimeErrorGuard(page);
     await page.goto("/vehicles");
     await bannerLocators(page).rejectButton.click().catch(() => {}); // banner may or may not be present depending on prior test isolation — best-effort dismiss
 
-    const resultsHeading = page.getByText(/Αποτελέσματα:/);
+    const resultsHeading = page.getByText(RESULTS_LABEL_PATTERN);
     await expect(resultsHeading).toBeVisible();
 
     const hasCards = await page.locator("a[href^='/vehicles/']").count();
@@ -97,6 +107,12 @@ test.describe("[40] vehicle listing / filter regression", () => {
     await expect(priceSection).toBeVisible();
     await priceSection.click();
     await expect(priceSection).toHaveAttribute("aria-expanded", "true");
+    // AccordionTrigger ignores a click on this same trigger while its
+    // open/close animation is still running (deliberate anti-flash guard —
+    // see waitForAccordionSettled/accordion.tsx). Waiting for that
+    // animation to actually finish before the second click mirrors the
+    // real minimum interaction cadence a human click provides.
+    await waitForAccordionSettled(priceSection);
     await priceSection.click();
     await expect(priceSection).toHaveAttribute("aria-expanded", "false");
   });
@@ -131,7 +147,7 @@ test.describe("[40] vehicle listing / filter regression", () => {
     await page.goto("/vehicles");
     await bannerLocators(page).acceptAllButton.click();
     await expect(bannerLocators(page).region).toBeHidden();
-    const resultsHeading = page.getByText(/Αποτελέσματα:/);
+    const resultsHeading = page.getByText(RESULTS_LABEL_PATTERN);
     await expect(resultsHeading).toBeVisible();
     await expect(resultsHeading).toBeInViewport();
   });

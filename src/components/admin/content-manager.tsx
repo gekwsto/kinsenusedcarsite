@@ -24,17 +24,26 @@ import type {
  * the section's local (unsaved) form state via `onChange` — mirrors how
  * every text field here behaves: the change only actually persists once
  * the section's own "Αποθήκευση" button PATCHes the whole record.
+ *
+ * `onUploadingChange` reports this field's in-flight status up to the
+ * section, which uses it to disable "Αποθήκευση" for the duration — without
+ * it, clicking Save while the upload is still in flight would PATCH the
+ * form's still-stale `value.image` (the upload's `onChange` hasn't landed
+ * yet), persisting the *old* image while the UI briefly appears to show the
+ * new one, until the next reload reverts it.
  */
 function ImageUploadField({
   sectionKey,
   label,
   value,
   onChange,
+  onUploadingChange,
 }: {
   sectionKey: ContentKey;
   label: string;
   value: string;
   onChange: (url: string) => void;
+  onUploadingChange: (uploading: boolean) => void;
 }) {
   const { toast } = useToast();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -44,6 +53,7 @@ function ImageUploadField({
     const file = event.target.files?.[0];
     if (!file) return;
     setUploading(true);
+    onUploadingChange(true);
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -59,6 +69,7 @@ function ImageUploadField({
       toast({ title: "Σφάλμα", description: error instanceof Error ? error.message : "Κάτι πήγε στραβά", variant: "destructive" });
     } finally {
       setUploading(false);
+      onUploadingChange(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
@@ -83,8 +94,20 @@ function useContentSection<T>(sectionKey: ContentKey, initialValue: T) {
   const { toast } = useToast();
   const [value, setValue] = React.useState<T>(initialValue);
   const [saving, setSaving] = React.useState(false);
+  // Number of image fields in this section currently mid-upload. A section
+  // can hold more than one image (e.g. BenefitsEditor's 3 cards), so this is
+  // a counter rather than a single flag — Save must stay blocked as long as
+  // any one of them is still in flight.
+  const [pendingUploads, setPendingUploads] = React.useState(0);
+  const registerUploading = React.useCallback((uploading: boolean) => {
+    setPendingUploads((count) => count + (uploading ? 1 : -1));
+  }, []);
 
   const save = async () => {
+    if (pendingUploads > 0) {
+      toast({ title: "Περιμένετε να ολοκληρωθεί η μεταφόρτωση εικόνας", variant: "destructive" });
+      return;
+    }
     setSaving(true);
     try {
       const res = await fetch(`/api/admin/content/${sectionKey}`, {
@@ -121,24 +144,35 @@ function useContentSection<T>(sectionKey: ContentKey, initialValue: T) {
     }
   };
 
-  return { value, setValue, save, reset, saving };
+  return { value, setValue, save, reset, saving, uploading: pendingUploads > 0, registerUploading };
 }
 
-function SectionActions({ onSave, onReset, saving }: { onSave: () => void; onReset: () => void; saving: boolean }) {
+function SectionActions({
+  onSave,
+  onReset,
+  saving,
+  uploading,
+}: {
+  onSave: () => void;
+  onReset: () => void;
+  saving: boolean;
+  uploading: boolean;
+}) {
+  const busy = saving || uploading;
   return (
     <div className="flex justify-end gap-2 pt-2">
-      <Button type="button" variant="outline" size="sm" onClick={onReset} disabled={saving}>
+      <Button type="button" variant="outline" size="sm" onClick={onReset} disabled={busy}>
         <RotateCcw className="h-3.5 w-3.5" /> Προεπιλογή
       </Button>
-      <Button type="button" size="sm" onClick={onSave} disabled={saving}>
-        <Save className="h-3.5 w-3.5" /> {saving ? "Αποθήκευση…" : "Αποθήκευση"}
+      <Button type="button" size="sm" onClick={onSave} disabled={busy} title={uploading ? "Περιμένετε να ολοκληρωθεί η μεταφόρτωση εικόνας" : undefined}>
+        <Save className="h-3.5 w-3.5" /> {saving ? "Αποθήκευση…" : uploading ? "Μεταφόρτωση εικόνας…" : "Αποθήκευση"}
       </Button>
     </div>
   );
 }
 
 export function HeroEditor({ initialValue }: { initialValue: HeroContent }) {
-  const { value, setValue, save, reset, saving } = useContentSection<HeroContent>("home.hero", initialValue);
+  const { value, setValue, save, reset, saving, uploading, registerUploading } = useContentSection<HeroContent>("home.hero", initialValue);
   return (
     <Card>
       <CardHeader><CardTitle>Αρχική — Κεντρικός τίτλος (Hero)</CardTitle></CardHeader>
@@ -153,8 +187,18 @@ export function HeroEditor({ initialValue }: { initialValue: HeroContent }) {
             <Input value={value.line2} onChange={(e) => setValue({ ...value, line2: e.target.value })} />
           </div>
         </div>
-        <ImageUploadField sectionKey="home.hero" label="Φωτογραφία φόντου" value={value.image} onChange={(image) => setValue({ ...value, image })} />
-        <SectionActions onSave={save} onReset={reset} saving={saving} />
+        <div className="space-y-1.5">
+          <Label>Υπότιτλος</Label>
+          <Input value={value.subtitle} onChange={(e) => setValue({ ...value, subtitle: e.target.value })} />
+        </div>
+        <ImageUploadField
+          sectionKey="home.hero"
+          label="Φωτογραφία φόντου"
+          value={value.image}
+          onChange={(image) => setValue({ ...value, image })}
+          onUploadingChange={registerUploading}
+        />
+        <SectionActions onSave={save} onReset={reset} saving={saving} uploading={uploading} />
       </CardContent>
     </Card>
   );
@@ -178,7 +222,7 @@ export function StatsEditor({ initialValue }: { initialValue: StatsContent }) {
           <Label>Παράγραφος 2</Label>
           <Textarea rows={2} value={value.paragraph2} onChange={(e) => setValue({ ...value, paragraph2: e.target.value })} />
         </div>
-        <SectionActions onSave={save} onReset={reset} saving={saving} />
+        <SectionActions onSave={save} onReset={reset} saving={saving} uploading={false} />
       </CardContent>
     </Card>
   );
@@ -220,14 +264,14 @@ export function HowItWorksEditor({ initialValue }: { initialValue: HowItWorksCon
             </div>
           ))}
         </div>
-        <SectionActions onSave={save} onReset={reset} saving={saving} />
+        <SectionActions onSave={save} onReset={reset} saving={saving} uploading={false} />
       </CardContent>
     </Card>
   );
 }
 
 export function BenefitsEditor({ initialValue }: { initialValue: BenefitsContent }) {
-  const { value, setValue, save, reset, saving } = useContentSection<BenefitsContent>("home.benefits", initialValue);
+  const { value, setValue, save, reset, saving, uploading, registerUploading } = useContentSection<BenefitsContent>("home.benefits", initialValue);
 
   const updateCard = (index: number, field: "title" | "description" | "image", text: string) => {
     const cards = value.cards.map((card, i) => (i === index ? { ...card, [field]: text } : card));
@@ -247,6 +291,7 @@ export function BenefitsEditor({ initialValue }: { initialValue: BenefitsContent
                 label="Φωτογραφία"
                 value={card.image}
                 onChange={(image) => updateCard(index, "image", image)}
+                onUploadingChange={registerUploading}
               />
               <Input value={card.title} onChange={(e) => updateCard(index, "title", e.target.value)} placeholder="Τίτλος" />
               <Textarea
@@ -258,7 +303,7 @@ export function BenefitsEditor({ initialValue }: { initialValue: BenefitsContent
             </div>
           ))}
         </div>
-        <SectionActions onSave={save} onReset={reset} saving={saving} />
+        <SectionActions onSave={save} onReset={reset} saving={saving} uploading={uploading} />
       </CardContent>
     </Card>
   );
@@ -273,7 +318,7 @@ export function InfoHeroEditor({
   label: string;
   initialValue: InfoHeroContent;
 }) {
-  const { value, setValue, save, reset, saving } = useContentSection<InfoHeroContent>(sectionKey, initialValue);
+  const { value, setValue, save, reset, saving, uploading, registerUploading } = useContentSection<InfoHeroContent>(sectionKey, initialValue);
   return (
     <Card>
       <CardHeader><CardTitle>{label} — Τίτλος σελίδας</CardTitle></CardHeader>
@@ -286,8 +331,14 @@ export function InfoHeroEditor({
           <Label>Υπότιτλος</Label>
           <Input value={value.subtitle} onChange={(e) => setValue({ ...value, subtitle: e.target.value })} />
         </div>
-        <ImageUploadField sectionKey={sectionKey} label="Φωτογραφία" value={value.image} onChange={(image) => setValue({ ...value, image })} />
-        <SectionActions onSave={save} onReset={reset} saving={saving} />
+        <ImageUploadField
+          sectionKey={sectionKey}
+          label="Φωτογραφία"
+          value={value.image}
+          onChange={(image) => setValue({ ...value, image })}
+          onUploadingChange={registerUploading}
+        />
+        <SectionActions onSave={save} onReset={reset} saving={saving} uploading={uploading} />
       </CardContent>
     </Card>
   );
@@ -324,7 +375,7 @@ export function InfoCardsEditor({
             </div>
           ))}
         </div>
-        <SectionActions onSave={save} onReset={reset} saving={saving} />
+        <SectionActions onSave={save} onReset={reset} saving={saving} uploading={false} />
       </CardContent>
     </Card>
   );

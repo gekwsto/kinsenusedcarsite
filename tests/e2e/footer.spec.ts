@@ -115,13 +115,50 @@ test.describe("premium footer redesign", () => {
     await expect(footer.getByRole("button", { name: "Ρυθμίσεις Cookies", exact: true })).toBeVisible();
   });
 
-  test("the decorative KINSEN watermark is present but inert (aria-hidden, no pointer events, not a real link)", async ({ page }) => {
+  test("the decorative Kinsen watermark logo is present but inert (aria-hidden, no pointer events, not a real link)", async ({ page }) => {
     await page.goto("/");
     await dismissBanner(page);
 
-    const watermark = page.locator("footer").getByText("KINSEN", { exact: true });
-    await expect(watermark).toBeVisible();
-    await expect(watermark.locator("xpath=..")).toHaveAttribute("aria-hidden", "true");
+    // The watermark is the real Kinsen logo asset (kinsen_logowhite.png,
+    // the same image used in transactional emails — see footer.tsx), not a
+    // "KINSEN" text wordmark; it was intentionally redesigned from text to
+    // this image. Target the actual asset by its src rather than by text.
+    const watermarkWrapper = page.locator("footer > div[aria-hidden='true']").filter({
+      has: page.locator('img[src*="kinsen_logowhite"]'),
+    });
+    const watermarkImg = watermarkWrapper.locator("img");
+
+    await watermarkImg.scrollIntoViewIfNeeded();
+    await expect(watermarkImg).toBeVisible();
+    await expect(watermarkWrapper).toHaveAttribute("aria-hidden", "true");
+    await expect(watermarkWrapper).toHaveClass(/pointer-events-none/);
+
+    // Real, correctly-loaded image, not a broken/zero-size asset. The
+    // browser hasn't necessarily finished decoding the image bytes just
+    // because layout has reserved its box (Next/Image sets width/height
+    // attributes upfront) — wait for the actual load to complete rather
+    // than racing it, since naturalWidth is legitimately 0 until then.
+    const box = await watermarkImg.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.width).toBeGreaterThan(0);
+    expect(box!.height).toBeGreaterThan(0);
+    const naturalWidth = await watermarkImg.evaluate(
+      (img: HTMLImageElement) =>
+        img.complete
+          ? img.naturalWidth
+          : new Promise<number>((resolve) => {
+              img.addEventListener("load", () => resolve(img.naturalWidth), { once: true });
+              img.addEventListener("error", () => resolve(0), { once: true });
+            }),
+    );
+    expect(naturalWidth).toBeGreaterThan(0);
+
+    // Not a real link/button — purely decorative, must never be focusable
+    // or expose an accessible name that would make a screen reader announce
+    // it as interactive content.
+    await expect(watermarkImg).not.toHaveAttribute("role", "link");
+    const tagName = await watermarkWrapper.evaluate((el) => el.tagName);
+    expect(tagName).toBe("DIV");
   });
 
   test.describe("responsive", () => {
