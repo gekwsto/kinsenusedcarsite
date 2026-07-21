@@ -16,7 +16,7 @@ export async function Hero() {
       />
       <div className="absolute inset-0 flex items-center bg-black/10">
         <div className="container-page">
-          <h1 className="group max-w-xl text-left text-3xl font-black leading-tight transition-transform duration-[400ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-safe:hover:-translate-y-[3px] sm:text-5xl">
+          <h1 className="group max-w-xl text-left text-3xl font-black leading-tight tracking-tight drop-shadow-[0_2px_16px_rgba(0,0,0,0.12)] transition-transform duration-[400ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-safe:hover:-translate-y-[3px] sm:text-5xl lg:max-w-2xl lg:text-6xl xl:max-w-3xl xl:text-7xl 2xl:max-w-4xl 2xl:text-8xl">
             <div className="text-navy">{content.line1}</div>
             {/* No transform/transition on this line — it exists only to give
                 the underline something to be `absolute`-positioned against.
@@ -27,11 +27,11 @@ export async function Hero() {
               {content.line2}
               <span
                 aria-hidden="true"
-                className="absolute left-0 top-full mt-1 h-[2px] w-[72%] origin-left scale-x-0 rounded-full bg-accent opacity-0 transition-[transform,opacity] duration-[360ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none group-hover:scale-x-100 group-hover:opacity-75"
+                className="absolute left-0 top-full mt-1 h-[2px] w-[72%] origin-left scale-x-0 rounded-full bg-accent opacity-0 transition-[transform,opacity] duration-[360ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none group-hover:scale-x-100 group-hover:opacity-75 lg:h-[3px] xl:h-1"
               />
             </div>
           </h1>
-          <p className="mt-3 max-w-xs text-left text-base font-normal leading-snug text-navy sm:max-w-sm sm:text-lg">
+          <p className="mt-3 max-w-xs text-left text-base font-normal leading-snug text-navy drop-shadow-[0_1px_8px_rgba(0,0,0,0.08)] sm:mt-4 sm:max-w-sm sm:text-lg lg:mt-5 lg:max-w-md lg:text-xl xl:mt-6 xl:max-w-lg xl:text-2xl 2xl:max-w-2xl 2xl:text-3xl">
             {content.subtitle}
           </p>
         </div>
