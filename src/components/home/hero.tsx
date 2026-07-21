@@ -15,7 +15,12 @@ export async function Hero() {
         className="object-cover"
       />
       <div className="absolute inset-0 flex items-center bg-black/10">
-        <div className="container-page">
+        {/* Deliberately not `.container-page` (mx-auto max-w-7xl) — that
+            centers the text block and leaves a growing empty gap on the
+            left as the viewport widens. Padding-only, no max-width/auto-
+            margins, so the text stays pinned to the true left edge of the
+            banner at every screen size instead of drifting toward center. */}
+        <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16">
           <h1 className="group max-w-xl text-left text-3xl font-black leading-tight tracking-tight drop-shadow-[0_2px_16px_rgba(0,0,0,0.12)] transition-transform duration-[400ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-safe:hover:-translate-y-[3px] sm:text-5xl lg:max-w-2xl lg:text-6xl xl:max-w-3xl xl:text-7xl 2xl:max-w-4xl 2xl:text-8xl">
             <div className="text-navy">{content.line1}</div>
             {/* No transform/transition on this line — it exists only to give
