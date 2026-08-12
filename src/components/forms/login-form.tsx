@@ -8,10 +8,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useNavigationTransition } from "@/components/providers/navigation-transition-provider";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { KINSEN_GLOW_SURFACE_CLASSNAME, KinsenGlowOverlay } from "@/components/ui/kinsen-glow-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { loginSchema, type LoginInput } from "@/lib/validators/auth.schema";
+import { cn } from "@/lib/utils";
 
 export function LoginForm() {
   const router = useRouter();
@@ -116,9 +118,22 @@ export function LoginForm() {
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <Button type="submit" className="w-full" disabled={submitting}>
-        {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-        Σύνδεση
+      {/* Same Kinsen navy → expanding-teal-circle hover system as the navbar
+          "Σύνδεση" action (see kinsen-glow-button.tsx) — just this form's
+          own existing full-width sizing. `disabled:pointer-events-none`
+          (already on the shared Button base) means the hover/active glow
+          simply never engages while `submitting`, with no extra state
+          needed here for that. */}
+      <Button
+        type="submit"
+        className={cn(KINSEN_GLOW_SURFACE_CLASSNAME, "w-full rounded-md")}
+        disabled={submitting}
+      >
+        <KinsenGlowOverlay />
+        <span className="relative z-10 inline-flex items-center gap-2">
+          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          Σύνδεση
+        </span>
       </Button>
     </form>
   );
