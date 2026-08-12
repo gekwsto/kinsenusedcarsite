@@ -51,14 +51,53 @@ export function VehicleCompareToggle({ vehicle, className, size = "md", showLabe
       aria-label={label}
       aria-describedby={tooltipId}
       className={cn(
-        "group relative inline-flex items-center justify-center gap-1.5 rounded-full bg-white/90 shadow-soft backdrop-blur transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
-        showLabel ? "h-11 rounded-lg px-4 text-sm font-medium" : size === "sm" ? "h-8 w-8" : "h-10 w-10",
-        active && "bg-primary/10",
+        "group relative inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+        showLabel
+          ? [
+              // Corporate outlined button: a fixed 1px border at all times
+              // (only its *color* changes on hover, so the border never
+              // appears/disappears and never shifts layout), a shadow subtle
+              // enough to sit next to the bold `shadow-[0_8px_18px_...]`
+              // Leasing CTA without competing with it, and color-only
+              // transitions (no scale/transform) so hovering never nudges
+              // surrounding layout.
+              // Tighter padding below `sm:` — at the narrowest phone widths
+              // (~320px) the title + this button + the favorite button all
+              // share one row (see vehicle-pricing-section.tsx), and the
+              // wider sm:px-5 padding this button uses at rest tipped that
+              // row into horizontal overflow (measured: 13px past a 320px
+              // viewport). px-3 reclaims exactly that without touching the
+              // roomier tablet/desktop treatment.
+              "h-11 gap-1.5 rounded-lg border border-[#dfe8ed] bg-white px-3 text-sm font-bold text-ink shadow-soft transition-[color,background-color,border-color,box-shadow] duration-200 ease-out motion-reduce:transition-none sm:gap-2 sm:px-5",
+              "hover:border-detail/40 hover:bg-detail/[0.06] hover:shadow-card",
+              active && "border-detail/50 bg-detail/[0.08]",
+            ]
+          : [
+              "rounded-full bg-white/90 shadow-soft backdrop-blur transition-transform hover:scale-105",
+              size === "sm" ? "h-8 w-8" : "h-10 w-10",
+              active && "bg-primary/10",
+            ],
         className,
       )}
     >
-      <Scale className={cn(size === "sm" ? "h-4 w-4" : "h-5 w-5", active ? "text-primary" : "text-ink-muted")} />
-      {showLabel && <span className={active ? "text-primary" : "text-ink"}>{active ? "Στη σύγκριση" : "Σύγκριση"}</span>}
+      <Scale
+        className={cn(
+          size === "sm" ? "h-4 w-4" : "h-5 w-5",
+          active ? (showLabel ? "text-detail" : "text-primary") : "text-ink-muted",
+          showLabel && !active && "transition-colors duration-200 ease-out group-hover:text-detail motion-reduce:transition-none",
+        )}
+      />
+      {showLabel && (
+        <span
+          className={cn(
+            active
+              ? "text-detail"
+              : "text-ink transition-colors duration-200 ease-out group-hover:text-detail motion-reduce:transition-none",
+          )}
+        >
+          {active ? "Στη σύγκριση" : "Σύγκριση"}
+        </span>
+      )}
 
       {!showLabel && (
         <span

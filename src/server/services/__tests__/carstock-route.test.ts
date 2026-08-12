@@ -100,7 +100,7 @@ test("create one new vehicle: returns {ok:true, added:1}", async (t) => {
   assert.deepEqual(await readJson(response), { ok: true, added: 1 });
 });
 
-test("update an existing vehicle: returns {ok:true, added:0}", async (t) => {
+test("an existing carId is skipped, not updated: returns {ok:true, added:0} and the vehicle stays unchanged", async (t) => {
   withApiKey(t);
   if (await skipIfDbUnreachable(t)) return;
 
@@ -116,9 +116,12 @@ test("update an existing vehicle: returns {ok:true, added:0}", async (t) => {
   const response = await POST(buildRequest([{ carId, km: 20000 }]));
   assert.equal(response.status, 200);
   assert.deepEqual(await readJson(response), { ok: true, added: 0 });
+
+  const vehicle = await prisma.vehicle.findUnique({ where: { externalCarId: carId } });
+  assert.equal(vehicle!.km, 10000, "POST is CREATE-only; a second push for the same carId must never update it");
 });
 
-test("freeze an existing vehicle: returns {ok:true, added:0}", async (t) => {
+test("an existing carId with {carId, froze:true} is skipped, not frozen: returns {ok:true, added:0}", async (t) => {
   withApiKey(t);
   if (await skipIfDbUnreachable(t)) return;
 
@@ -134,9 +137,12 @@ test("freeze an existing vehicle: returns {ok:true, added:0}", async (t) => {
   const response = await POST(buildRequest([{ carId, froze: true }]));
   assert.equal(response.status, 200);
   assert.deepEqual(await readJson(response), { ok: true, added: 0 });
+
+  const vehicle = await prisma.vehicle.findUnique({ where: { externalCarId: carId } });
+  assert.equal(vehicle!.froze, false, "the old {carId, froze} partial update is no longer performed by POST");
 });
 
-test("delete an existing vehicle: returns {ok:true, added:0}", async (t) => {
+test("POST no longer honors the old delete flag: vehicle stays isDeleted:false", async (t) => {
   withApiKey(t);
   if (await skipIfDbUnreachable(t)) return;
 
@@ -152,9 +158,13 @@ test("delete an existing vehicle: returns {ok:true, added:0}", async (t) => {
   const response = await POST(buildRequest([{ carId, delete: true }]));
   assert.equal(response.status, 200);
   assert.deepEqual(await readJson(response), { ok: true, added: 0 });
+
+  const vehicle = await prisma.vehicle.findUnique({ where: { externalCarId: carId } });
+  assert.ok(vehicle, "the vehicle must still exist");
+  assert.equal(vehicle!.isDeleted, false, "the old {delete:true} flag must no longer soft-delete via POST");
 });
 
-test("mixed create/update payload: added counts only the newly created vehicle", async (t) => {
+test("batch of an existing carId + a new carId: added counts only the newly created vehicle, existing stays untouched", async (t) => {
   withApiKey(t);
   if (await skipIfDbUnreachable(t)) return;
 
@@ -174,9 +184,99 @@ test("mixed create/update payload: added counts only the newly created vehicle",
   const response = await POST(
     buildRequest([
       { carId: existingCarId, km: 15000 },
-      { carId: newCarId, maker: "BMW", model: "320d" },
+      { carId: newCarId, maker: "BMW", model: "320d Batch Mixed Fixture" },
     ]),
   );
   assert.equal(response.status, 200);
   assert.deepEqual(await readJson(response), { ok: true, added: 1 });
+
+  const existing = await prisma.vehicle.findUnique({ where: { externalCarId: existingCarId } });
+  assert.equal(existing!.km, null, "the existing vehicle must remain untouched, not receive km:15000");
+});
+
+test("multiple new carIds in one batch create multiple Vehicles: added:2", async (t) => {
+  withApiKey(t);
+  if (await skipIfDbUnreachable(t)) return;
+
+  const carIdA = "carstock-route-multi-new-a";
+  const carIdB = "carstock-route-multi-new-b";
+  t.after(async () => {
+    await cleanupVehicle(carIdA);
+    await cleanupVehicle(carIdB);
+    await cleanupImportLogsForCarId(carIdA);
+    await cleanupImportLogsForCarId(carIdB);
+  });
+  await cleanupVehicle(carIdA);
+  await cleanupVehicle(carIdB);
+
+  const response = await POST(
+    buildRequest([
+      { carId: carIdA, maker: "Toyota", model: "Corolla Multi New Fixture A" },
+      { carId: carIdB, maker: "BMW", model: "320d Multi New Fixture B" },
+    ]),
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(await readJson(response), { ok: true, added: 2 });
+
+  const vehicleA = await prisma.vehicle.findUnique({ where: { externalCarId: carIdA } });
+  const vehicleB = await prisma.vehicle.findUnique({ where: { externalCarId: carIdB } });
+  assert.ok(vehicleA);
+  assert.ok(vehicleB);
+});
+
+test("a carId repeated twice in one batch creates only one Vehicle: added:1", async (t) => {
+  withApiKey(t);
+  if (await skipIfDbUnreachable(t)) return;
+
+  const carId = "carstock-route-intra-batch-dup";
+  t.after(async () => {
+    await cleanupVehicle(carId);
+    await cleanupImportLogsForCarId(carId);
+  });
+  await cleanupVehicle(carId);
+
+  const response = await POST(
+    buildRequest([
+      { carId, maker: "BMW", model: "320d Dup Route A" },
+      { carId, maker: "BMW", model: "320d Dup Route B" },
+    ]),
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(await readJson(response), { ok: true, added: 1 });
+
+  const vehicles = await prisma.vehicle.findMany({ where: { externalCarId: carId } });
+  assert.equal(vehicles.length, 1);
+});
+
+test("POST persists ExtrasDTO as VehicleExtra rows on create", async (t) => {
+  withApiKey(t);
+  if (await skipIfDbUnreachable(t)) return;
+
+  const carId = "carstock-route-extras-create-1";
+  t.after(async () => {
+    await cleanupVehicle(carId);
+    await cleanupImportLogsForCarId(carId);
+  });
+  await cleanupVehicle(carId);
+
+  const response = await POST(
+    buildRequest([
+      {
+        carId,
+        maker: "BMW",
+        model: "X1 Extras Route Fixture",
+        ExtrasDTO: [{ displayName: "Navigation" }, { displayName: "  Heated seats  " }, { displayName: "   " }],
+      },
+    ]),
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(await readJson(response), { ok: true, added: 1 });
+
+  const vehicle = await prisma.vehicle.findUnique({ where: { externalCarId: carId }, include: { extras: true } });
+  assert.ok(vehicle);
+  assert.deepEqual(
+    vehicle!.extras.map((e) => e.displayName).sort(),
+    ["Heated seats", "Navigation"],
+    "blank extras must be dropped and displayName trimmed",
+  );
 });

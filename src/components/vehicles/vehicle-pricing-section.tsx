@@ -5,13 +5,23 @@ import { CalendarDays, Gauge, ShieldCheck, CheckCircle2, ArrowRight } from "luci
 import { FavoriteButton } from "@/components/vehicles/favorite-button";
 import { VehicleCompareToggle } from "@/components/vehicles/vehicle-compare-toggle";
 import { InterestModalTrigger } from "@/components/vehicles/interest-modal";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import {
+  SpecsExtrasSelector,
+  SpecsGrid,
+  ExtrasPanel,
+  type VehicleSpecItem,
+  type VehicleExtraItem,
+} from "@/components/vehicles/vehicle-specs-tabs";
+import { SegmentedGlider, useGliderRect } from "@/components/vehicles/segmented-glider";
 import { cn, formatEuro, formatKm } from "@/lib/utils";
 import type { VehicleComparisonSummary } from "@/lib/vehicle-comparison";
 
 type PricingTab = "LEASING" | "PURCHASE";
+type InfoTab = "specs" | "extras";
 
 const CTA_CLASSNAME =
-  "flex w-full items-center justify-center gap-3 rounded-lg border border-detail bg-detail px-4 py-3.5 text-sm font-extrabold text-white transition-colors hover:bg-[#004c74]";
+  "flex w-full items-center justify-center gap-2 rounded-lg border border-detail bg-detail px-3.5 py-3.5 text-sm font-extrabold text-white transition-colors hover:bg-[#004c74]";
 
 interface VehiclePricingSectionProps {
   vehicleId: string;
@@ -26,6 +36,8 @@ interface VehiclePricingSectionProps {
   fuel: string | null;
   transmissionType: string | null;
   imageUrl: string | null;
+  specs: VehicleSpecItem[];
+  extras: VehicleExtraItem[];
 }
 
 // Leasing/Αγορά is a real tab now, not decoration: exactly one price card,
@@ -33,6 +45,15 @@ interface VehiclePricingSectionProps {
 // `activeTab`. Lives in one client component (rather than two, split across
 // the left/right grid columns) because the tab buttons on the left and the
 // price panel on the right must share that same state.
+//
+// The Χαρακτηριστικά/Έξτρα εξοπλισμός selector (`infoTab`) and its content
+// panels live here too, for the same reason: the selector sits in the same
+// action row as — and beside — the ONE interest CTA below, and that CTA's
+// label/behavior is entirely driven by `activeTab`. Splitting the selector
+// into its own component with its own independent CTA previously produced
+// a second, redundant "Ενδιαφέρομαι για Leasing" button; keeping both
+// pieces of state in this one component is what makes exactly one CTA
+// possible.
 export function VehiclePricingSection({
   vehicleId,
   vehicleSlug,
@@ -46,10 +67,27 @@ export function VehiclePricingSection({
   fuel,
   transmissionType,
   imageUrl,
+  specs,
+  extras,
 }: VehiclePricingSectionProps) {
   const hasLeasing = monthlyPrice !== null;
   const hasPurchase = price !== null;
   const [activeTab, setActiveTab] = React.useState<PricingTab>(hasLeasing ? "LEASING" : "PURCHASE");
+  const [infoTab, setInfoTab] = React.useState<InfoTab>("specs");
+
+  // Same shared glider system as the Χαρακτηριστικά/Έξτρα εξοπλισμός
+  // selector below (see segmented-glider.tsx) — only wired here when BOTH
+  // options exist; with just one, there's nothing to slide between, so that
+  // single button keeps its original always-active solid styling instead.
+  const bothPricingOptionsAvailable = hasLeasing && hasPurchase;
+  const pricingTrackRef = React.useRef<HTMLDivElement>(null);
+  const leasingButtonRef = React.useRef<HTMLButtonElement>(null);
+  const purchaseButtonRef = React.useRef<HTMLButtonElement>(null);
+  const pricingGlider = useGliderRect(
+    pricingTrackRef,
+    activeTab === "LEASING" ? leasingButtonRef : purchaseButtonRef,
+    activeTab,
+  );
 
   const comparisonSummary: VehicleComparisonSummary = {
     id: vehicleId,
@@ -67,22 +105,40 @@ export function VehiclePricingSection({
 
   const showLeasing = activeTab === "LEASING" && hasLeasing;
   const showPurchase = activeTab === "PURCHASE" && hasPurchase;
+  // Whichever offer is currently active also determines the ONE CTA's
+  // label/interestType below — never a second, independent selection.
+  const ctaAvailable = showLeasing || showPurchase;
 
   return (
-    <div className="grid grid-cols-1 gap-6 border-b border-[#e8eef2] pb-6 lg:grid-cols-[1fr_1.25fr] lg:gap-10">
+    <Tabs value={infoTab} onValueChange={(value) => setInfoTab(value as InfoTab)}>
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_1.25fr] lg:gap-10">
       {/* Left: tabs, title, meta */}
       <div>
-        <div className="mb-4 grid w-full max-w-[320px] grid-cols-2 gap-1 rounded-full border border-[#dfe8ed] bg-[#f7fafc] p-1">
+        <div
+          ref={pricingTrackRef}
+          className={cn(
+            "relative mb-4 grid w-full max-w-[320px] grid-cols-2 rounded-full border p-1 transition-colors duration-300 ease-out motion-reduce:transition-none",
+            !bothPricingOptionsAvailable || activeTab === "LEASING"
+              ? "border-[#dfe8ed] bg-[#f7fafc]"
+              : "border-[#cfe6ea] bg-[#f2f9fa]",
+          )}
+        >
+          {bothPricingOptionsAvailable && (
+            <SegmentedGlider rect={pricingGlider} tone={activeTab === "LEASING" ? "a" : "b"} sweepKey={activeTab} />
+          )}
           {hasLeasing && (
             <button
+              ref={leasingButtonRef}
               type="button"
               onClick={() => setActiveTab("LEASING")}
               aria-pressed={showLeasing}
               className={cn(
-                "rounded-full py-2 text-center text-sm font-extrabold transition-colors",
-                showLeasing
-                  ? "bg-detail text-white shadow-[0_8px_18px_rgba(0,137,154,0.22)]"
-                  : "text-[#8a97a5] hover:text-detail-title",
+                "relative z-10 rounded-full py-2 text-center text-sm font-extrabold transition-colors duration-200 ease-out motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                bothPricingOptionsAvailable
+                  ? showLeasing
+                    ? "text-white"
+                    : "text-[#8a97a5] hover:bg-white/50 hover:text-detail-title"
+                  : "bg-detail text-white shadow-[0_8px_18px_rgba(0,137,154,0.22)]",
               )}
             >
               Leasing
@@ -90,14 +146,17 @@ export function VehiclePricingSection({
           )}
           {hasPurchase && (
             <button
+              ref={purchaseButtonRef}
               type="button"
               onClick={() => setActiveTab("PURCHASE")}
               aria-pressed={activeTab === "PURCHASE"}
               className={cn(
-                "rounded-full py-2 text-center text-sm font-extrabold transition-colors",
-                activeTab === "PURCHASE"
-                  ? "bg-detail text-white shadow-[0_8px_18px_rgba(0,137,154,0.22)]"
-                  : "text-[#8a97a5] hover:text-detail-title",
+                "relative z-10 rounded-full py-2 text-center text-sm font-extrabold transition-colors duration-200 ease-out motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                bothPricingOptionsAvailable
+                  ? activeTab === "PURCHASE"
+                    ? "text-white"
+                    : "text-[#8a97a5] hover:bg-white/50 hover:text-detail-title"
+                  : "bg-detail text-white shadow-[0_8px_18px_rgba(0,137,154,0.22)]",
               )}
             >
               Αγορά
@@ -172,20 +231,50 @@ export function VehiclePricingSection({
             </>
           )}
         </div>
-
-        <div className="grid grid-cols-1 gap-4">
-          {showLeasing && (
-            <InterestModalTrigger interestType="LEASING" className={CTA_CLASSNAME}>
-              Ενδιαφέρομαι για Leasing <ArrowRight className="h-4 w-4" />
-            </InterestModalTrigger>
-          )}
-          {showPurchase && (
-            <InterestModalTrigger interestType="PURCHASE" className={CTA_CLASSNAME}>
-              Ενδιαφέρομαι για Αγορά <ArrowRight className="h-4 w-4" />
-            </InterestModalTrigger>
-          )}
-        </div>
       </div>
     </div>
+
+    {/* Full-width action row, a SIBLING of the two-column grid above (not
+        nested inside its right column) — the Χαρακτηριστικά/Έξτρα
+        εξοπλισμός selector occupies the left 50%, the ONE interest CTA the
+        right 50%, via the same `grid-cols-2` the upper columns use for
+        their own left/right split (just an even 1fr/1fr split here, not
+        the upper section's 1fr/1.25fr — the two are independent grids that
+        happen to sit in the same card, not one shared template). The
+        selector does not stretch to fill its cell (`justify-self-start`);
+        it stays its natural compact size, left-aligned, exactly like the
+        "Leasing/Αγορά" pill above it. The CTA fills its cell, matching the
+        existing full-width premium button language.
+
+        This switches to 2 columns at `lg:` (1024px), not `sm:` (640px):
+        a `minmax(0,1fr)` grid column (Tailwind's `grid-cols-2`) does not
+        grow to protect a non-stretched child's content width — if the
+        selector's natural (compact) width exceeds its 50% share, it
+        visually overflows into the CTA's cell instead of the cell
+        widening for it. Measured: the selector's natural content width is
+        ~370px, so a cell needs the full row to be >~950px wide to fit it
+        without a stretched CTA-column also cramping. Below `lg:`, the row
+        stays a single column (selector, full width via its own internal
+        breakpoint, then the CTA beneath it); `lg:`+ is comfortably above
+        that threshold at every wider viewport (the card's max-width only
+        grows from there). */}
+    <div className="mt-5 grid grid-cols-1 gap-3 border-b border-[#e8eef2] pb-6 lg:grid-cols-2 lg:items-center lg:gap-6">
+      <SpecsExtrasSelector activeTab={infoTab} className="justify-self-start" />
+      {ctaAvailable && (
+        <InterestModalTrigger interestType={activeTab} className={CTA_CLASSNAME}>
+          Ενδιαφέρομαι για {showLeasing ? "Leasing" : "Αγορά"} <ArrowRight className="h-4 w-4" />
+        </InterestModalTrigger>
+      )}
+    </div>
+
+    <div className="mt-6">
+      <TabsContent value="specs">
+        <SpecsGrid specs={specs} />
+      </TabsContent>
+      <TabsContent value="extras">
+        <ExtrasPanel extras={extras} />
+      </TabsContent>
+    </div>
+    </Tabs>
   );
 }

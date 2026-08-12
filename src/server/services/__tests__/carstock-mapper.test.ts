@@ -3,9 +3,11 @@ import assert from "node:assert/strict";
 import {
   carStockItemSchema,
   carStockPayloadSchema,
+  carStockDeleteBodySchema,
+  carStockUpdatePayloadSchema,
   normalizeCarStockItemKeys,
 } from "@/lib/validators/carstock.schema";
-import { normalizeVehiclePayload } from "@/lib/vehicle-normalization";
+import { normalizeVehiclePayload, normalizeExtras } from "@/lib/vehicle-normalization";
 
 // The exact payload shape the real, currently-integrated CarStock system
 // sends (lower-camel-case, `delete`/`rent`/`image_url` included).
@@ -187,4 +189,145 @@ test("legacy and real payloads normalize to the same canonical key set", () => {
 test("rejects a payload missing the required carId", () => {
   const result = carStockPayloadSchema.safeParse([{ maker: "Toyota" }]);
   assert.equal(result.success, false);
+});
+
+test("ExtrasDTO: remapped to the canonical `extras` key", () => {
+  const parsed = carStockItemSchema.parse({
+    ...REAL_PAYLOAD,
+    ExtrasDTO: [{ displayName: "Navigation" }, { displayName: "Heated seats" }],
+  });
+  assert.deepEqual(parsed.extras, [{ displayName: "Navigation" }, { displayName: "Heated seats" }]);
+});
+
+test("ExtrasDTO: absent normalizes to undefined at the schema layer, and [] via normalizeExtras", () => {
+  const parsed = carStockItemSchema.parse(REAL_PAYLOAD);
+  assert.equal(parsed.extras, undefined);
+  assert.deepEqual(normalizeExtras(parsed.extras), []);
+});
+
+test("normalizeExtras: trims displayName and drops blank/whitespace-only entries", () => {
+  const result = normalizeExtras([
+    { displayName: "Navigation" },
+    { displayName: "  Heated seats  " },
+    { displayName: "   " },
+    { displayName: "" },
+    { displayName: null },
+    {},
+  ]);
+  assert.deepEqual(result, [{ displayName: "Navigation" }, { displayName: "Heated seats" }]);
+});
+
+test("normalizeExtras: null, absent, and non-array input all normalize to an empty collection", () => {
+  assert.deepEqual(normalizeExtras(null), []);
+  assert.deepEqual(normalizeExtras(undefined), []);
+  assert.deepEqual(normalizeExtras([]), []);
+});
+
+test("carStockDeleteBodySchema: accepts a bare array of carIds", () => {
+  const result = carStockDeleteBodySchema.safeParse([123, "456"]);
+  assert.equal(result.success, true);
+});
+
+test("carStockDeleteBodySchema: accepts a { carIds: [...] } wrapper", () => {
+  const result = carStockDeleteBodySchema.safeParse({ carIds: [123, 456] });
+  assert.equal(result.success, true);
+});
+
+test("carStockDeleteBodySchema: rejects an empty array", () => {
+  const result = carStockDeleteBodySchema.safeParse([]);
+  assert.equal(result.success, false);
+});
+
+// ---------- carId hardening: trimmed, non-empty string; numeric preserved ----------
+
+test("POST/CREATE: rejects carId = \"\"", () => {
+  const result = carStockPayloadSchema.safeParse([{ carId: "", maker: "Toyota" }]);
+  assert.equal(result.success, false);
+});
+
+test("POST/CREATE: rejects carId = \"   \" (whitespace-only)", () => {
+  const result = carStockPayloadSchema.safeParse([{ carId: "   ", maker: "Toyota" }]);
+  assert.equal(result.success, false);
+});
+
+test("POST/CREATE: accepts a valid non-empty string carId", () => {
+  const result = carStockPayloadSchema.safeParse([{ carId: "car-100", maker: "Toyota" }]);
+  assert.equal(result.success, true);
+});
+
+test("POST/CREATE: accepts a valid numeric carId", () => {
+  const result = carStockPayloadSchema.safeParse([{ carId: 100, maker: "Toyota" }]);
+  assert.equal(result.success, true);
+});
+
+test("POST/CREATE: a string carId is trimmed before it becomes the identity", () => {
+  const parsed = carStockItemSchema.parse({ carId: "  100  ", maker: "Toyota" });
+  assert.equal(parsed.carId, "100");
+});
+
+function completeUpdateWireItem(carId: unknown, overrides: Record<string, unknown> = {}) {
+  return {
+    carId,
+    maker: "BMW",
+    model: "X1",
+    versionName: "sDrive18i",
+    rent: 500,
+    yearRelease: 2024,
+    vin: "VIN123",
+    km: 10000,
+    cc: 1499,
+    hp: 136,
+    fuel: "Βενζίνη",
+    color: "Black",
+    typeOfCar: "SUV",
+    transmissionType: "Automatic",
+    price: 30000,
+    ExtrasDTO: [],
+    ...overrides,
+  };
+}
+
+test('PUT: rejects carId = ""', () => {
+  const result = carStockUpdatePayloadSchema.safeParse([completeUpdateWireItem("")]);
+  assert.equal(result.success, false);
+});
+
+test('PUT: rejects carId = "   " (whitespace-only)', () => {
+  const result = carStockUpdatePayloadSchema.safeParse([completeUpdateWireItem("   ")]);
+  assert.equal(result.success, false);
+});
+
+test("PUT: accepts a valid non-empty string carId", () => {
+  const result = carStockUpdatePayloadSchema.safeParse([completeUpdateWireItem("car-100")]);
+  assert.equal(result.success, true);
+});
+
+test("PUT: accepts a valid numeric carId", () => {
+  const result = carStockUpdatePayloadSchema.safeParse([completeUpdateWireItem(100)]);
+  assert.equal(result.success, true);
+});
+
+test("PUT: a string carId is trimmed before it becomes the identity", () => {
+  const [parsed] = carStockUpdatePayloadSchema.parse([completeUpdateWireItem("  100  ")]);
+  assert.equal(parsed!.carId, "100");
+});
+
+test('DELETE: rejects a bulk collection containing carId = ""', () => {
+  const result = carStockDeleteBodySchema.safeParse(["100", ""]);
+  assert.equal(result.success, false);
+});
+
+test('DELETE: rejects a bulk collection containing carId = "   "', () => {
+  const result = carStockDeleteBodySchema.safeParse(["100", "   "]);
+  assert.equal(result.success, false);
+});
+
+test("DELETE: accepts a bulk collection of valid non-empty string and numeric carIds", () => {
+  const result = carStockDeleteBodySchema.safeParse(["car-100", 200]);
+  assert.equal(result.success, true);
+});
+
+test("DELETE: a string carId is trimmed before dedup/lookup", () => {
+  const parsed = carStockDeleteBodySchema.parse(["  100  "]);
+  assert.deepEqual(parsed, ["100"]);
 });

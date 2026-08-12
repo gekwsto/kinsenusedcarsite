@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
 import { normalizeYearRelease, normalizeVehiclePayload } from "@/lib/vehicle-normalization";
 import { carStockItemSchema, carStockPayloadSchema } from "@/lib/validators/carstock.schema";
-import { upsertVehicleFromStock } from "@/server/services/vehicle.service";
+import { createVehicleFromCarStock } from "@/server/services/vehicle.service";
 import { POST } from "@/app/api/integrations/carstock/cars-updated/route";
 import { prisma } from "@/lib/prisma";
 
@@ -125,13 +125,13 @@ async function cleanupImportLogsForCarId(carId: string) {
   }
 }
 
-test("upsertVehicleFromStock: creates the vehicle from the exact production payload with yearRelease=2022", async (t) => {
+test("createVehicleFromCarStock: creates the vehicle from the exact production payload with yearRelease=2022", async (t) => {
   if (await skipIfDbUnreachable(t)) return;
   t.after(() => cleanupVehicle(EXTERNAL_ID));
   await cleanupVehicle(EXTERNAL_ID);
 
   const [item] = carStockPayloadSchema.parse([PRODUCTION_PAYLOAD]);
-  const result = await upsertVehicleFromStock(item!);
+  const result = await createVehicleFromCarStock(item!);
   assert.equal(result.action, "created");
 
   const vehicle = await prisma.vehicle.findUnique({ where: { externalCarId: EXTERNAL_ID } });

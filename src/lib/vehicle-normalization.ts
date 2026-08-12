@@ -151,6 +151,28 @@ export function normalizeString(raw: unknown): string | null {
   return str.length > 0 ? str : null;
 }
 
+export interface NormalizedExtraInput {
+  displayName: string;
+}
+
+/**
+ * CarStock's `ExtrasDTO` collection: trims each `displayName` and drops
+ * blank/whitespace-only entries (never persisted as VehicleExtra rows).
+ * `null`/absent/non-array input all normalize to an empty collection, which
+ * for callers doing full-replacement (PUT) means "remove all extras".
+ */
+export function normalizeExtras(raw: unknown): NormalizedExtraInput[] {
+  if (!Array.isArray(raw)) return [];
+  const result: NormalizedExtraInput[] = [];
+  for (const entry of raw) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const displayName = normalizeString((entry as { displayName?: unknown }).displayName);
+    if (!displayName) continue;
+    result.push({ displayName });
+  }
+  return result;
+}
+
 export interface NormalizedVehicleInput {
   maker: string | null;
   model: string | null;

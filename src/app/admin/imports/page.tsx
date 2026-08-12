@@ -35,6 +35,7 @@ export default async function AdminImportsPage({ searchParams }: AdminImportsPag
               <th className="px-4 py-3">Παραλήφθηκαν</th>
               <th className="px-4 py-3">Δημιουργήθηκαν</th>
               <th className="px-4 py-3">Ενημερώθηκαν</th>
+              <th className="px-4 py-3">Παραλείφθηκαν</th>
               <th className="px-4 py-3">Διαγράφηκαν</th>
               <th className="px-4 py-3">Παγώθηκαν</th>
               <th className="px-4 py-3">Ημερομηνία</th>
@@ -43,7 +44,7 @@ export default async function AdminImportsPage({ searchParams }: AdminImportsPag
           <tbody>
             {result.items.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-ink-muted">
+                <td colSpan={9} className="px-4 py-8 text-center text-ink-muted">
                   Δεν υπάρχουν εισαγωγές
                 </td>
               </tr>
@@ -61,6 +62,7 @@ export default async function AdminImportsPage({ searchParams }: AdminImportsPag
                 <td className="px-4 py-3">{log.receivedCount}</td>
                 <td className="px-4 py-3">{log.createdCount}</td>
                 <td className="px-4 py-3">{log.updatedCount}</td>
+                <td className="px-4 py-3">{log.skippedCount}</td>
                 <td className="px-4 py-3">{log.deletedCount}</td>
                 <td className="px-4 py-3">{log.frozenCount}</td>
                 <td className="px-4 py-3 text-ink-muted">

@@ -19,4 +19,5 @@ dev-server.log
 # baselines are the point of toHaveScreenshot()).
 playwright-report/
 test-results/
+tests/e2e/*-snapshots/
 blob-report/

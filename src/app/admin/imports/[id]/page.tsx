@@ -45,10 +45,11 @@ export default async function ImportDetailPage({ params }: ImportDetailPageProps
         <CardHeader>
           <CardTitle>Σύνοψη</CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+        <CardContent className="grid grid-cols-2 gap-4 sm:grid-cols-6">
           <Stat label="Παραλήφθηκαν" value={log.receivedCount} />
           <Stat label="Δημιουργήθηκαν" value={log.createdCount} />
           <Stat label="Ενημερώθηκαν" value={log.updatedCount} />
+          <Stat label="Παραλείφθηκαν" value={log.skippedCount} />
           <Stat label="Διαγράφηκαν" value={log.deletedCount} />
           <Stat label="Παγώθηκαν" value={log.frozenCount} />
         </CardContent>

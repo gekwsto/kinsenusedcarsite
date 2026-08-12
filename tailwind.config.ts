@@ -79,12 +79,23 @@ const config: Config = {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        // A single light-sweep pass across the vehicle-detail
+        // Χαρακτηριστικά/Έξτρα εξοπλισμός glider on selection change — never
+        // looping, remounted via a React `key` change so it always plays
+        // exactly once per switch (see vehicle-specs-tabs.tsx).
+        "tab-glider-sweep": {
+          "0%": { transform: "translateX(-120%)", opacity: "0" },
+          "15%": { opacity: "1" },
+          "85%": { opacity: "1" },
+          "100%": { transform: "translateX(220%)", opacity: "0" },
+        },
       },
       animation: {
         "fade-in": "fade-in 0.2s ease-out",
         "slide-up": "slide-up 0.25s ease-out",
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "tab-glider-sweep": "tab-glider-sweep 420ms ease-out",
       },
     },
   },

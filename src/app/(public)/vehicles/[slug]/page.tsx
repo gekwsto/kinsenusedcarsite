@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Car, CarFront, Shapes, Fuel, Cog, Gauge, Zap, Box, Palette } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { VehicleGallery } from "@/components/vehicles/vehicle-gallery";
 import { InterestModalProvider } from "@/components/vehicles/interest-modal";
 import { VehiclePricingSection } from "@/components/vehicles/vehicle-pricing-section";
+import { type VehicleSpecItem } from "@/components/vehicles/vehicle-specs-tabs";
 import { VehicleGrid } from "@/components/vehicles/vehicle-grid";
 import { getPublicVehicleBySlug, getSimilarVehicles } from "@/server/services/vehicle.service";
 import { resolveVehicleImages, resolveVehicleImagesForList } from "@/server/services/vehicle-image.service";
@@ -57,16 +57,19 @@ export default async function VehicleDetailPage({ params }: { params: Promise<Pa
   // this same vehicleLabel.
   const vehicleLabel = `${vehicle.versionName}${vehicle.yearRelease ? ` ${vehicle.yearRelease}` : ""}`;
 
-  const specs: { icon: typeof Car; label: string; value: string }[] = [
-    { icon: Car, label: "Μάρκα", value: vehicle.maker || "-" },
-    { icon: CarFront, label: "Μοντέλο", value: vehicle.versionName || "-" },
-    { icon: Shapes, label: "Κατηγορία", value: vehicle.typeOfCar || "-" },
-    { icon: Fuel, label: "Καύσιμο", value: vehicle.fuel || "-" },
-    { icon: Cog, label: "Κιβώτιο", value: vehicle.transmissionType || "-" },
-    { icon: Gauge, label: "Χιλιόμετρα", value: vehicle.km !== null ? `${formatKm(vehicle.km)}` : "-" },
-    { icon: Zap, label: "Ιπποδύναμη", value: vehicle.hp !== null ? `${vehicle.hp} hp` : "-" },
-    { icon: Box, label: "Κυβικά", value: vehicle.cc !== null ? `${vehicle.cc} cc` : "-" },
-    { icon: Palette, label: "Χρώμα", value: vehicle.color || "-" },
+  // `icon` is deliberately not part of this data — a component reference
+  // can't cross the Server -> Client Component boundary. VehiclePricingSection
+  // (via SpecsGrid) resolves each `key` to its icon on the client side.
+  const specs: VehicleSpecItem[] = [
+    { key: "maker", label: "Μάρκα", value: vehicle.maker || "-" },
+    { key: "model", label: "Μοντέλο", value: vehicle.versionName || "-" },
+    { key: "category", label: "Κατηγορία", value: vehicle.typeOfCar || "-" },
+    { key: "fuel", label: "Καύσιμο", value: vehicle.fuel || "-" },
+    { key: "transmission", label: "Κιβώτιο", value: vehicle.transmissionType || "-" },
+    { key: "km", label: "Χιλιόμετρα", value: vehicle.km !== null ? `${formatKm(vehicle.km)}` : "-" },
+    { key: "hp", label: "Ιπποδύναμη", value: vehicle.hp !== null ? `${vehicle.hp} hp` : "-" },
+    { key: "cc", label: "Κυβικά", value: vehicle.cc !== null ? `${vehicle.cc} cc` : "-" },
+    { key: "color", label: "Χρώμα", value: vehicle.color || "-" },
   ];
 
   const jsonLd = {
@@ -112,22 +115,9 @@ export default async function VehicleDetailPage({ params }: { params: Promise<Pa
             fuel={vehicle.fuel}
             transmissionType={vehicle.transmissionType}
             imageUrl={resolvedGallery.mainImage.url}
+            specs={specs}
+            extras={vehicle.extras.map((extra) => ({ id: extra.id, displayName: extra.displayName }))}
           />
-
-          {/* Specs grid */}
-          <div className="grid grid-cols-1 gap-x-4 pt-5 sm:grid-cols-2 lg:grid-cols-3">
-            {specs.map(({ icon: Icon, label, value }) => (
-              <div key={label} className="flex items-center gap-3.5 border-b border-[#edf2f5] px-1 py-4 last:border-b-0">
-                <span className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full border border-[#dfe8ed] bg-white text-detail">
-                  <Icon className="h-4 w-4" />
-                </span>
-                <div>
-                  <small className="block font-bold text-[#8a97a5]">{label}</small>
-                  <strong className="block font-black text-detail-title">{value}</strong>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { carStockPayloadSchema } from "@/lib/validators/carstock.schema";
 import { processCarStockPayload } from "@/server/services/import.service";
+import { isCarStockAuthorized } from "@/lib/carstock-auth";
 
 /**
  * The real CarStock client only understands `CreateUmbraccoCarsRoot`:
@@ -16,39 +17,14 @@ function carStockResponse(ok: boolean, added: number, status: number) {
   return NextResponse.json({ ok, added }, { status });
 }
 
-function isAuthorized(request: NextRequest): boolean {
-  const apiKey = process.env.CARSTOCK_API_KEY;
-  if (!apiKey) return false;
-
-  const header = request.headers.get("authorization") ?? "";
-  const [scheme, token] = header.split(" ");
-  if (scheme !== "Bearer" || !token) return false;
-
-  return token === apiKey;
-}
-
 export async function POST(request: NextRequest) {
-  // TEMPORARY diagnostic for the production 403 investigation (used.kinsen.gr
-  // returns 403 for the real CarStock caller before this line would ever
-  // execute, if the block happens at Cloudflare/Nginx Proxy Manager). Its
-  // presence or absence in prod logs is the definitive test for "did this
-  // request even reach the Next.js container." Never logs the token value —
-  // only presence/shape of the Authorization header. Remove once the 403 is
-  // root-caused.
-  console.info("[carstock-diagnostic]", {
-    pathname: request.nextUrl.pathname,
-    hasAuthorizationHeader: request.headers.has("authorization"),
-    startsWithBearer: (request.headers.get("authorization") ?? "").startsWith("Bearer "),
-    reachedRouteHandler: true,
-  });
-
   try {
     if (!process.env.CARSTOCK_API_KEY) {
       // Never silently allow requests when the shared secret isn't configured.
       return carStockResponse(false, 0, 500);
     }
 
-    if (!isAuthorized(request)) {
+    if (!isCarStockAuthorized(request)) {
       return carStockResponse(false, 0, 401);
     }
 
@@ -60,8 +36,11 @@ export async function POST(request: NextRequest) {
       return carStockResponse(false, 0, 400);
     }
 
-    // `added` counts only newly inserted Vehicle rows — updates, freezes and
-    // deletes are tracked internally (ImportLog) but never surfaced here.
+    // `added` counts only newly inserted Vehicle rows. POST is CREATE-only:
+    // an existing carId (or one repeated within the batch) is skipped, never
+    // updated — see createVehicleFromCarStock in vehicle.service.ts. Skipped
+    // counts and any per-item errors are tracked internally via ImportLog
+    // (skippedCount) but never surfaced through this response.
     const result = await processCarStockPayload(parsed.data, "carstock");
 
     return carStockResponse(true, result.createdCount, 200);

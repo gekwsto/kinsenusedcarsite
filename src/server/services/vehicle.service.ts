@@ -1,18 +1,27 @@
-import { Prisma, type Vehicle, type VehicleImage } from "@prisma/client";
+import { Prisma, type Vehicle, type VehicleImage, type VehicleExtra } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { generateUniqueVehicleSlug } from "@/lib/slug";
-import { normalizeVehiclePayload, type NormalizedVehicleInput } from "@/lib/vehicle-normalization";
+import {
+  normalizeVehiclePayload,
+  normalizeExtras,
+  type NormalizedVehicleInput,
+  type NormalizedExtraInput,
+} from "@/lib/vehicle-normalization";
 import type { VehicleAdminInput, VehicleAdminUpdateInput, VehicleFilterInput } from "@/lib/validators/vehicle.schema";
 import type { CarStockPayloadItem } from "@/lib/validators/carstock.schema";
 
 export type VehicleWithImages = Vehicle & { images: VehicleImage[] };
 
-export function serializeVehicle(vehicle: Vehicle & { images?: VehicleImage[] }) {
+// `extras` is optional here (like `images`) so every existing caller that
+// doesn't `include: { extras: true }` keeps getting `extras: []` rather than
+// a type error — only getPublicVehicleBySlug currently loads the relation.
+export function serializeVehicle(vehicle: Vehicle & { images?: VehicleImage[]; extras?: VehicleExtra[] }) {
   return {
     ...vehicle,
     price: vehicle.price ? Number(vehicle.price) : null,
     monthlyPrice: vehicle.monthlyPrice ? Number(vehicle.monthlyPrice) : null,
     images: vehicle.images ?? [],
+    extras: vehicle.extras ?? [],
   };
 }
 
@@ -173,7 +182,10 @@ export async function listPublicVehicles(filters: VehicleFilterInput) {
 export async function getPublicVehicleBySlug(slug: string) {
   const vehicle = await prisma.vehicle.findFirst({
     where: { slug, ...PUBLIC_WHERE },
-    include: { images: { orderBy: { sortOrder: "asc" } } },
+    include: {
+      images: { orderBy: { sortOrder: "asc" } },
+      extras: { orderBy: { createdAt: "asc" } },
+    },
   });
   return vehicle ? serializeVehicle(vehicle) : null;
 }
@@ -457,106 +469,194 @@ export async function reorderVehicleImages(vehicleId: string, orderedImageIds: s
 // ---------- External stock integration ----------
 
 /**
- * Upserts a vehicle from the external stock feed. Preserves images and any
- * manually-edited SEO fields — the feed only owns stock data (price, km,
- * spec, flags), never photos or copy.
+ * Deletes and re-creates a vehicle's VehicleExtra rows to match `extras`
+ * exactly (full replacement, never a patch). Callers run this inside the
+ * same `prisma.$transaction` as the Vehicle write it accompanies, so a
+ * failure here can never leave a create/update partially applied.
  */
-export async function upsertVehicleFromStock(raw: CarStockPayloadItem) {
-  const externalCarId = String(raw.carId);
-  const normalized = normalizeVehiclePayload(raw);
-
-  const existing = await prisma.vehicle.findUnique({ where: { externalCarId } });
-
-  if (!existing) {
-    if (normalized.isDeleted) {
-      return { action: "skipped" as const };
-    }
-    const slug = await generateUniqueVehicleSlug({
-      maker: normalized.maker ?? "vehicle",
-      model: normalized.model ?? externalCarId,
-      yearRelease: normalized.yearRelease,
+async function replaceVehicleExtras(
+  tx: Prisma.TransactionClient,
+  vehicleId: string,
+  extras: NormalizedExtraInput[],
+) {
+  await tx.vehicleExtra.deleteMany({ where: { vehicleId } });
+  if (extras.length > 0) {
+    await tx.vehicleExtra.createMany({
+      data: extras.map((extra) => ({ vehicleId, displayName: extra.displayName })),
     });
-    await prisma.vehicle.create({
-      data: {
-        externalCarId,
-        slug,
-        ...stockDataFromNormalized(normalized),
-        maker: normalized.maker ?? "Άγνωστο",
-        model: normalized.model ?? externalCarId,
-        versionName: normalized.versionName ?? normalized.model ?? externalCarId,
-      },
-    });
-    return { action: "created" as const };
   }
-
-  const significantChange =
-    (normalized.maker && normalized.maker !== existing.maker) ||
-    (normalized.model && normalized.model !== existing.model) ||
-    (normalized.yearRelease && normalized.yearRelease !== existing.yearRelease);
-
-  const slug = significantChange
-    ? await generateUniqueVehicleSlug(
-        {
-          maker: normalized.maker ?? existing.maker,
-          model: normalized.model ?? existing.model,
-          yearRelease: normalized.yearRelease ?? existing.yearRelease,
-        },
-        existing.id,
-      )
-    : existing.slug;
-
-  await prisma.vehicle.update({
-    where: { id: existing.id },
-    data: {
-      ...stockUpdateDataFromRaw(raw, normalized),
-      slug,
-    },
-  });
-
-  return {
-    action: normalized.isDeleted ? ("deleted" as const) : normalized.froze ? ("frozen" as const) : ("updated" as const),
-  };
 }
 
 /**
- * Builds the update payload for an EXISTING vehicle, field-by-field, only
- * touching keys the feed actually sent this time. Real stock feeds commonly
- * push minimal deltas (e.g. `{carId, froze}` to just freeze a listing) — if
- * every normalized field were written unconditionally, that single flag
- * flip would null out km/cc/hp/fuel/etc. on every such call. Contrast with
- * stockDataFromNormalized() below, used only for brand-new vehicles, where
- * defaulting absent fields to null is correct.
- *
- * `raw.imageUrl` is deliberately never read here — see the field comment on
- * the canonical schema in carstock.schema.ts.
+ * True for any Prisma P2002 (unique constraint violation), regardless of
+ * which constraint it names. Deliberately NOT a decision about *which*
+ * unique field collided — Postgres/Prisma's choice of which conflicting
+ * index to report in `error.meta.target` is not something this code should
+ * depend on (see the comment on the P2002 catch in createVehicleFromCarStock
+ * below for why). Exported so it's directly unit-testable.
  */
-function stockUpdateDataFromRaw(
-  raw: CarStockPayloadItem,
-  normalized: NormalizedVehicleInput,
-): Prisma.VehicleUncheckedUpdateInput {
-  const data: Prisma.VehicleUncheckedUpdateInput = {};
+export function isPrismaP2002(error: unknown): error is Prisma.PrismaClientKnownRequestError {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+}
 
-  if (raw.maker !== undefined) data.maker = normalized.maker ?? undefined;
-  if (raw.model !== undefined) data.model = normalized.model ?? undefined;
-  if (raw.versionName !== undefined) data.versionName = normalized.versionName ?? undefined;
-  if (raw.yearRelease !== undefined) data.yearRelease = normalized.yearRelease;
-  if (raw.price !== undefined) data.price = normalized.price;
-  if (raw.monthlyPrice !== undefined) data.monthlyPrice = normalized.monthlyPrice;
-  if (raw.km !== undefined) data.km = normalized.km;
-  if (raw.cc !== undefined) data.cc = normalized.cc;
-  if (raw.hp !== undefined) data.hp = normalized.hp;
-  if (raw.discountType !== undefined) data.discountType = normalized.discountType;
-  if (raw.fuel !== undefined) data.fuel = normalized.fuel;
-  if (raw.transmissionType !== undefined) data.transmissionType = normalized.transmissionType;
-  if (raw.color !== undefined) data.color = normalized.color;
-  if (raw.typeOfCar !== undefined) data.typeOfCar = normalized.typeOfCar;
-  if (raw.offer !== undefined) data.offer = normalized.offer;
-  if (raw.froze !== undefined) data.froze = normalized.froze;
-  if (raw.isDeleted !== undefined) data.isDeleted = normalized.isDeleted;
-  if (raw.plate !== undefined) data.plate = normalized.plate;
-  if (raw.vin !== undefined) data.vin = normalized.vin;
+/**
+ * CarStock CREATE (POST /api/integrations/carstock/cars-updated). STRICT
+ * create-only: a brand-new externalCarId is created (with its ExtrasDTO
+ * persisted as VehicleExtra rows, atomically); a carId that already exists
+ * is left completely untouched — no scalar field, VIN, froze flag, extras,
+ * image, or admin/SEO field is ever modified by this path. Updating an
+ * existing vehicle is exclusively PUT's job (see applyCarStockFullUpdate
+ * below) — CREATE has no update responsibility at all anymore, partial or
+ * otherwise.
+ *
+ * Deletion is likewise not a responsibility of this path — CarStock's old
+ * `{carId, delete: true}` flag is validated but never read here; soft-deletes
+ * go exclusively through DELETE /api/integrations/carstock/cars-delete.
+ *
+ * The findUnique check above is the normal control-flow path for "this carId
+ * already exists". It is not race-proof by itself: two overlapping requests
+ * (or a retried request) for the same brand-new carId can both pass it
+ * before either commits its create — and, since both would then also
+ * generate the same slug, a losing request's create can fail with P2002 on
+ * *either* `externalCarId` or `slug`, depending on which constraint Postgres
+ * happens to report. Trusting `error.meta.target` to tell them apart would
+ * make this depend on database/index ordering, so instead: on any P2002, run
+ * one fresh, authoritative lookup on `externalCarId` alone. If it now
+ * exists, this was another request winning the exact same CarStock vehicle
+ * — treat it exactly like a pre-existing carId (`skipped`), never a failure
+ * and never a hidden update. If it still doesn't exist, the P2002 was caused
+ * by something else entirely (e.g. a genuine slug collision unrelated to
+ * this carId) and must not be swallowed — the original error is rethrown.
+ * The failed transaction has already rolled back by this point, so no
+ * partial Vehicle/VehicleExtra state is ever left behind either way.
+ */
+export async function createVehicleFromCarStock(raw: CarStockPayloadItem) {
+  const externalCarId = String(raw.carId);
 
-  return data;
+  const existing = await prisma.vehicle.findUnique({ where: { externalCarId }, select: { id: true } });
+  if (existing) {
+    return { action: "skipped" as const };
+  }
+
+  const normalized = normalizeVehiclePayload(raw);
+  const extras = normalizeExtras(raw.extras);
+
+  const slug = await generateUniqueVehicleSlug({
+    maker: normalized.maker ?? "vehicle",
+    model: normalized.model ?? externalCarId,
+    yearRelease: normalized.yearRelease,
+  });
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      const vehicle = await tx.vehicle.create({
+        data: {
+          externalCarId,
+          slug,
+          ...stockDataFromNormalized(normalized),
+          maker: normalized.maker ?? "Άγνωστο",
+          model: normalized.model ?? externalCarId,
+          versionName: normalized.versionName ?? normalized.model ?? externalCarId,
+        },
+      });
+      await replaceVehicleExtras(tx, vehicle.id, extras);
+    });
+  } catch (error) {
+    if (isPrismaP2002(error)) {
+      const existingAfterRace = await prisma.vehicle.findUnique({ where: { externalCarId }, select: { id: true } });
+      if (existingAfterRace) {
+        return { action: "skipped" as const };
+      }
+    }
+    throw error;
+  }
+
+  return { action: "created" as const };
+}
+
+/**
+ * CarStock UPDATE (PUT /api/integrations/carstock/cars-update). Looks the
+ * vehicle up by carId -> externalCarId only (never VIN) and, if found,
+ * overwrites every CarStock-owned scalar field with the incoming value —
+ * missing/null/empty normalizes to `null` via normalizeVehiclePayload, so an
+ * omitted field really does clear the existing value. `raw` is expected to
+ * come from carStockUpdatePayloadSchema (see carstock.schema.ts), which
+ * requires every one of these keys to be present and requires
+ * maker/model/versionName specifically to be non-blank — so unlike CREATE,
+ * there is no fallback to the vehicle's existing maker/model/versionName
+ * here: an incomplete or blank payload is rejected by validation *before*
+ * this function ever runs, so the values read below are trusted as-is.
+ * ExtrasDTO is a full replacement of the vehicle's extras, and runs in the
+ * same transaction as the scalar update. Never creates a vehicle, and never
+ * touches images, SEO copy, description, or any other admin-managed field.
+ */
+export async function applyCarStockFullUpdate(raw: CarStockPayloadItem) {
+  const externalCarId = String(raw.carId);
+  const existing = await prisma.vehicle.findUnique({ where: { externalCarId } });
+  if (!existing) {
+    return { action: "not_found" as const };
+  }
+
+  const normalized = normalizeVehiclePayload(raw);
+  const extras = normalizeExtras(raw.extras);
+
+  // Guaranteed non-null: carStockUpdateItemSchema requires maker/model/
+  // versionName to be present, trimmed, non-empty strings, and
+  // normalizeMaker/normalizeModel/normalizeString only ever return null for
+  // null/undefined/empty input.
+  const maker = normalized.maker!;
+  const model = normalized.model!;
+  const versionName = normalized.versionName!;
+  const yearRelease = normalized.yearRelease;
+
+  const significantChange = maker !== existing.maker || model !== existing.model || yearRelease !== existing.yearRelease;
+  const slug = significantChange
+    ? await generateUniqueVehicleSlug({ maker, model, yearRelease }, existing.id)
+    : existing.slug;
+
+  const data: Prisma.VehicleUncheckedUpdateInput = {
+    maker,
+    model,
+    versionName,
+    yearRelease,
+    price: normalized.price,
+    monthlyPrice: normalized.monthlyPrice,
+    km: normalized.km,
+    cc: normalized.cc,
+    hp: normalized.hp,
+    fuel: normalized.fuel,
+    transmissionType: normalized.transmissionType,
+    color: normalized.color,
+    typeOfCar: normalized.typeOfCar,
+    vin: normalized.vin,
+    slug,
+  };
+
+  await prisma.$transaction(async (tx) => {
+    await tx.vehicle.update({ where: { id: existing.id }, data });
+    await replaceVehicleExtras(tx, existing.id, extras);
+  });
+
+  return { action: "updated" as const };
+}
+
+/**
+ * CarStock DELETE (DELETE /api/integrations/carstock/cars-delete). Bulk,
+ * idempotent soft-delete keyed on carId -> externalCarId only (never VIN):
+ * flips `isDeleted` for every matching, not-yet-deleted vehicle in one
+ * `updateMany`, never calls `prisma.vehicle.delete`, and never touches
+ * VehicleExtra/VehicleImage/leads or any other relation. Unknown carIds
+ * simply match zero rows — no vehicle is ever created here. The returned
+ * count is only the vehicles newly flipped from false -> true, so resending
+ * the same carIds is always safe.
+ */
+export async function softDeleteVehiclesByExternalCarIds(externalCarIds: string[]) {
+  if (externalCarIds.length === 0) return { count: 0 };
+  const result = await prisma.vehicle.updateMany({
+    where: { externalCarId: { in: externalCarIds }, isDeleted: false },
+    data: { isDeleted: true },
+  });
+  return { count: result.count };
 }
 
 function stockDataFromNormalized(normalized: NormalizedVehicleInput) {
@@ -577,7 +677,6 @@ function stockDataFromNormalized(normalized: NormalizedVehicleInput) {
     typeOfCar: normalized.typeOfCar,
     offer: normalized.offer,
     froze: normalized.froze,
-    isDeleted: normalized.isDeleted,
     plate: normalized.plate,
     vin: normalized.vin,
   };

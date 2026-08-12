@@ -96,6 +96,7 @@ model Vehicle {
   seoDescription String?
 
   images    VehicleImage[]
+  extras    VehicleExtra[]
   favorites Favorite[]
   leads     Lead[]
 
@@ -126,6 +127,18 @@ model VehicleImage {
   alt       String?
   sortOrder Int     @default(0)
   isMain    Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([vehicleId])
+}
+
+model VehicleExtra {
+  id        String  @id @default(cuid())
+  vehicleId String
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  displayName String
 
   createdAt DateTime @default(now())
 
@@ -211,6 +224,7 @@ model ImportLog {
   receivedCount Int          @default(0)
   createdCount  Int          @default(0)
   updatedCount  Int          @default(0)
+  skippedCount  Int          @default(0)
   deletedCount  Int          @default(0)
   frozenCount   Int          @default(0)
   errors        Json?
