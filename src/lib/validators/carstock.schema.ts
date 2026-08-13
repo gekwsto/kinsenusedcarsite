@@ -206,7 +206,9 @@ export const carStockPayloadSchema = z.array(carStockItemSchema).min(1);
 export { realCarStockItemSchema, legacyCarStockItemSchema };
 
 /**
- * DELETE /api/integrations/carstock/cars-delete request contract. The
+ * POST /api/integrations/carstock/cars-delete request contract (POST, not
+ * HTTP DELETE — the external CMS has unreliable support for a JSON body on
+ * a DELETE request; the operation itself is still a pure soft delete). The
  * canonical body is a bare array of carId values (`[123, 456]`); a
  * `{ carIds: [...] }` wrapper is also accepted so a caller that prefers a
  * named field isn't forced into the bare-array shape. Both resolve to the
@@ -218,6 +220,23 @@ export const carStockDeleteBodySchema = z.union([
   carStockDeleteIdsArraySchema,
   z.object({ carIds: carStockDeleteIdsArraySchema }),
 ]);
+
+/**
+ * Shared strict-field building blocks for the "complete current CarStock
+ * state" contract — used by BOTH PUT's wire-format schema below AND POST's
+ * RESTORE-strictness schema further down (see carStockRestoreItemSchema).
+ * The two schemas validate different physical shapes (PUT's raw wire keys —
+ * rent/ExtrasDTO/... — vs POST's already-remapped canonical keys —
+ * monthlyPrice/extras/...), so they can't literally be the same z.object,
+ * but every FIELD-LEVEL rule (what counts as "required", "non-blank", or
+ * "present but nullable") is defined exactly once here and only referenced
+ * by both, so they cannot silently drift apart on what a valid full-state
+ * payload requires.
+ */
+const strictNonBlankString = (label: string) => z.string().trim().min(1, `${label} is required and must not be blank`);
+const strictNullableNumberOrString = z.union([z.string(), z.number()]).nullable();
+const strictNullableString = z.string().nullable();
+const strictExtrasArray = z.array(carStockExtraDtoSchema);
 
 /**
  * PUT /api/integrations/carstock/cars-update request contract. Deliberately
@@ -245,21 +264,21 @@ export const carStockDeleteBodySchema = z.union([
  */
 const carStockUpdateItemWireSchema = z.object({
   carId: carStockCarIdSchema,
-  maker: z.string().trim().min(1, "maker is required and must not be blank"),
-  model: z.string().trim().min(1, "model is required and must not be blank"),
-  versionName: z.string().trim().min(1, "versionName is required and must not be blank"),
-  rent: z.union([z.string(), z.number()]).nullable(),
-  yearRelease: z.union([z.string(), z.number()]).nullable(),
-  vin: z.string().nullable(),
-  km: z.union([z.string(), z.number()]).nullable(),
-  cc: z.union([z.string(), z.number()]).nullable(),
-  hp: z.union([z.string(), z.number()]).nullable(),
-  fuel: z.string().nullable(),
-  color: z.string().nullable(),
-  typeOfCar: z.string().nullable(),
-  transmissionType: z.string().nullable(),
-  price: z.union([z.string(), z.number()]).nullable(),
-  ExtrasDTO: z.array(carStockExtraDtoSchema),
+  maker: strictNonBlankString("maker"),
+  model: strictNonBlankString("model"),
+  versionName: strictNonBlankString("versionName"),
+  rent: strictNullableNumberOrString,
+  yearRelease: strictNullableNumberOrString,
+  vin: strictNullableString,
+  km: strictNullableNumberOrString,
+  cc: strictNullableNumberOrString,
+  hp: strictNullableNumberOrString,
+  fuel: strictNullableString,
+  color: strictNullableString,
+  typeOfCar: strictNullableString,
+  transmissionType: strictNullableString,
+  price: strictNullableNumberOrString,
+  ExtrasDTO: strictExtrasArray,
 });
 
 /**
@@ -291,3 +310,50 @@ export const carStockUpdateItemSchema = carStockUpdateItemWireSchema.transform(
 );
 
 export const carStockUpdatePayloadSchema = z.array(carStockUpdateItemSchema).min(1);
+
+/**
+ * RESTORE strictness check for POST /api/integrations/carstock/cars-updated,
+ * used only when an incoming carId resolves to an EXISTING, SOFT-DELETED
+ * Vehicle (see createVehicleFromCarStock in vehicle.service.ts). A restore
+ * must supply the complete current CarStock state, exactly like PUT — so
+ * this schema enforces the identical field-by-field rules as
+ * carStockUpdateItemWireSchema above (same shared strictNonBlankString /
+ * strictNullableNumberOrString / strictNullableString / strictExtrasArray
+ * building blocks — never re-implemented), just applied to the CANONICAL
+ * shape (monthlyPrice/extras/...) instead of the raw wire shape
+ * (rent/ExtrasDTO/...).
+ *
+ * Operating on the canonical shape rather than the original wire item is
+ * deliberately safe here, not a weaker approximation: normalizeCarStockItemKeys
+ * (see fromRealShape/fromLegacyShape above) does pure key-renaming with no
+ * value transformation, and every canonical field below is `.nullish()` on
+ * carStockCanonicalItemSchema, so a wire field that was completely absent
+ * comes through as `undefined` and an explicit `null` comes through as
+ * `null` — the exact distinction this schema needs to enforce is preserved
+ * intact by the time createVehicleFromCarStock has its parsed
+ * `CarStockPayloadItem` in hand. A missing key and a present-but-`undefined`
+ * key are indistinguishable to JSON (and to zod's own property access)
+ * either way, so nothing is lost by not re-parsing the original wire object.
+ *
+ * Only used to gate whether a restore may proceed — the ALREADY-parsed
+ * canonical item is what actually gets used for the mutation once this
+ * passes, so this schema's own transformed output is never consumed.
+ */
+export const carStockRestoreItemSchema = z.object({
+  carId: carStockCarIdSchema,
+  maker: strictNonBlankString("maker"),
+  model: strictNonBlankString("model"),
+  versionName: strictNonBlankString("versionName"),
+  yearRelease: strictNullableNumberOrString,
+  price: strictNullableNumberOrString,
+  monthlyPrice: strictNullableNumberOrString,
+  km: strictNullableNumberOrString,
+  cc: strictNullableNumberOrString,
+  hp: strictNullableNumberOrString,
+  fuel: strictNullableString,
+  transmissionType: strictNullableString,
+  color: strictNullableString,
+  typeOfCar: strictNullableString,
+  vin: strictNullableString,
+  extras: strictExtrasArray,
+});

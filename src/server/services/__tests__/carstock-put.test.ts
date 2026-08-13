@@ -112,13 +112,29 @@ function parseUpdateItem(carId: string, overrides: Record<string, unknown> = {})
   return carStockUpdatePayloadSchema.parse([completeItem(carId, overrides)])[0]!;
 }
 
+/** Every counter must be internally consistent with `results[]` — never asserted independently. */
+function assertEnvelopeInvariants(json: Record<string, unknown>) {
+  const results = json.results as Array<{ success: boolean }>;
+  assert.equal(json.total, results.length, "total must equal results.length");
+  assert.equal(json.ok, json.failed === 0, "ok must be exactly failed===0");
+  assert.equal(
+    (json.updated as number) + (json.skipped as number) + (json.failed as number),
+    json.total,
+    "updated+skipped+failed must equal total for PUT /cars-update",
+  );
+  assert.equal(json.added, 0, "PUT never creates");
+  assert.equal(json.deleted, 0, "PUT never deletes");
+}
+
+const EMPTY_FAILED_ENVELOPE = { ok: false, total: 0, added: 0, updated: 0, deleted: 0, skipped: 0, failed: 0, results: [] };
+
 // ---------- Auth ----------
 
-test("PUT: invalid token returns 401 and the safe {ok:false, updated:0} shape", async (t) => {
+test("PUT: invalid token returns 401 and the empty-failed envelope", async (t) => {
   withApiKey(t);
   const response = await PUT(buildRequest([{ carId: "irrelevant" }], "wrong-token"));
   assert.equal(response.status, 401);
-  assert.deepEqual(await response.json(), { ok: false, updated: 0 });
+  assert.deepEqual(await response.json(), EMPTY_FAILED_ENVELOPE);
 });
 
 test("PUT: missing Authorization header returns 401", async (t) => {
@@ -140,7 +156,11 @@ test("PUT validation: a complete valid payload succeeds", async (t) => {
 
   const response = await PUT(buildRequest([completeItem(carId)], TEST_TOKEN));
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { ok: true, updated: 1 });
+  const json = await response.json();
+  assertEnvelopeInvariants(json);
+  assert.equal(json.ok, true);
+  assert.equal(json.updated, 1);
+  assert.deepEqual(json.results, [{ carId, success: true, action: "updated", error: null }]);
 });
 
 test("PUT validation: missing maker is rejected with 400, DB untouched", async (t) => {
@@ -157,7 +177,7 @@ test("PUT validation: missing maker is rejected with 400, DB untouched", async (
 
   const response = await PUT(buildRequest([payload], TEST_TOKEN));
   assert.equal(response.status, 400);
-  assert.deepEqual(await response.json(), { ok: false, updated: 0 });
+  assert.deepEqual(await response.json(), EMPTY_FAILED_ENVELOPE);
 
   const vehicle = await prisma.vehicle.findUnique({ where: { externalCarId: carId } });
   assert.equal(vehicle!.maker, "BMW", "the DB must be untouched by a rejected payload");
@@ -171,7 +191,7 @@ test("PUT validation: missing model is rejected with 400", async (t) => {
 
   const response = await PUT(buildRequest([payload], TEST_TOKEN));
   assert.equal(response.status, 400);
-  assert.deepEqual(await response.json(), { ok: false, updated: 0 });
+  assert.deepEqual(await response.json(), EMPTY_FAILED_ENVELOPE);
 });
 
 test("PUT validation: missing versionName is rejected with 400", async (t) => {
@@ -182,7 +202,7 @@ test("PUT validation: missing versionName is rejected with 400", async (t) => {
 
   const response = await PUT(buildRequest([payload], TEST_TOKEN));
   assert.equal(response.status, 400);
-  assert.deepEqual(await response.json(), { ok: false, updated: 0 });
+  assert.deepEqual(await response.json(), EMPTY_FAILED_ENVELOPE);
 });
 
 test("PUT validation: null maker is rejected with 400", async (t) => {
@@ -190,7 +210,7 @@ test("PUT validation: null maker is rejected with 400", async (t) => {
   const carId = "carstock-put-null-maker-1";
   const response = await PUT(buildRequest([completeItem(carId, { maker: null })], TEST_TOKEN));
   assert.equal(response.status, 400);
-  assert.deepEqual(await response.json(), { ok: false, updated: 0 });
+  assert.deepEqual(await response.json(), EMPTY_FAILED_ENVELOPE);
 });
 
 test("PUT validation: blank (whitespace-only) maker is rejected with 400", async (t) => {
@@ -198,7 +218,7 @@ test("PUT validation: blank (whitespace-only) maker is rejected with 400", async
   const carId = "carstock-put-blank-maker-1";
   const response = await PUT(buildRequest([completeItem(carId, { maker: "   " })], TEST_TOKEN));
   assert.equal(response.status, 400);
-  assert.deepEqual(await response.json(), { ok: false, updated: 0 });
+  assert.deepEqual(await response.json(), EMPTY_FAILED_ENVELOPE);
 });
 
 test("PUT validation: missing price property is rejected with 400", async (t) => {
@@ -209,7 +229,7 @@ test("PUT validation: missing price property is rejected with 400", async (t) =>
 
   const response = await PUT(buildRequest([payload], TEST_TOKEN));
   assert.equal(response.status, 400);
-  assert.deepEqual(await response.json(), { ok: false, updated: 0 });
+  assert.deepEqual(await response.json(), EMPTY_FAILED_ENVELOPE);
 });
 
 test('PUT validation: explicit "price": null succeeds and the DB price becomes null', async (t) => {
@@ -223,7 +243,9 @@ test('PUT validation: explicit "price": null succeeds and the DB price becomes n
 
   const response = await PUT(buildRequest([completeItem(carId, { price: null })], TEST_TOKEN));
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { ok: true, updated: 1 });
+  const json = await response.json();
+  assertEnvelopeInvariants(json);
+  assert.deepEqual(json.results, [{ carId, success: true, action: "updated", error: null }]);
 
   const vehicle = await prisma.vehicle.findUnique({ where: { externalCarId: carId } });
   assert.equal(vehicle!.price, null);
@@ -237,7 +259,7 @@ test("PUT validation: missing vin property is rejected with 400", async (t) => {
 
   const response = await PUT(buildRequest([payload], TEST_TOKEN));
   assert.equal(response.status, 400);
-  assert.deepEqual(await response.json(), { ok: false, updated: 0 });
+  assert.deepEqual(await response.json(), EMPTY_FAILED_ENVELOPE);
 });
 
 test('PUT validation: explicit "vin": null succeeds and the DB vin becomes null', async (t) => {
@@ -251,7 +273,9 @@ test('PUT validation: explicit "vin": null succeeds and the DB vin becomes null'
 
   const response = await PUT(buildRequest([completeItem(carId, { vin: null })], TEST_TOKEN));
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { ok: true, updated: 1 });
+  const json = await response.json();
+  assertEnvelopeInvariants(json);
+  assert.deepEqual(json.results, [{ carId, success: true, action: "updated", error: null }]);
 
   const vehicle = await prisma.vehicle.findUnique({ where: { externalCarId: carId } });
   assert.equal(vehicle!.vin, null);
@@ -272,7 +296,7 @@ test("PUT validation: missing ExtrasDTO is rejected with 400", async (t) => {
 
   const response = await PUT(buildRequest([payload], TEST_TOKEN));
   assert.equal(response.status, 400);
-  assert.deepEqual(await response.json(), { ok: false, updated: 0 });
+  assert.deepEqual(await response.json(), EMPTY_FAILED_ENVELOPE);
 
   const extras = await prisma.vehicleExtra.findMany({ where: { vehicleId: vehicle.id } });
   assert.equal(extras.length, 1, "a rejected payload must never delete extras");
@@ -290,7 +314,9 @@ test('PUT validation: "ExtrasDTO": [] succeeds and clears extras', async (t) => 
 
   const response = await PUT(buildRequest([completeItem(carId, { ExtrasDTO: [] })], TEST_TOKEN));
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { ok: true, updated: 1 });
+  const json = await response.json();
+  assertEnvelopeInvariants(json);
+  assert.deepEqual(json.results, [{ carId, success: true, action: "updated", error: null }]);
 
   const extras = await prisma.vehicleExtra.findMany({ where: { vehicleId: vehicle.id } });
   assert.equal(extras.length, 0);
@@ -307,7 +333,7 @@ test("PUT validation: an incomplete {carId} payload is rejected before any mutat
 
   const response = await PUT(buildRequest([{ carId }], TEST_TOKEN));
   assert.equal(response.status, 400);
-  assert.deepEqual(await response.json(), { ok: false, updated: 0 });
+  assert.deepEqual(await response.json(), EMPTY_FAILED_ENVELOPE);
 
   const vehicle = await prisma.vehicle.findUnique({ where: { externalCarId: carId } });
   assert.equal(Number(vehicle!.price), 30000, "an incomplete payload must never null out DB values");
@@ -328,13 +354,15 @@ test("PUT: finds the vehicle by carId -> externalCarId", async (t) => {
 
   const response = await PUT(buildRequest([completeItem(carId, { price: 25000 })], TEST_TOKEN));
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { ok: true, updated: 1 });
+  const json = await response.json();
+  assertEnvelopeInvariants(json);
+  assert.deepEqual(json.results, [{ carId, success: true, action: "updated", error: null }]);
 
   const vehicle = await prisma.vehicle.findUnique({ where: { externalCarId: carId } });
   assert.equal(Number(vehicle!.price), 25000);
 });
 
-test("PUT: does not find (and does not update) a vehicle by VIN", async (t) => {
+test("PUT: does not find (and does not update) a vehicle by VIN — reported as a FAILURE result (vehicle_not_found)", async (t) => {
   withApiKey(t);
   if (await skipIfDbUnreachable(t)) return;
 
@@ -348,8 +376,13 @@ test("PUT: does not find (and does not update) a vehicle by VIN", async (t) => {
   // vehicle above via VIN matching. It just won't be found (no vehicle has
   // externalCarId === vin), so this is a not-found update, not a match.
   const response = await PUT(buildRequest([completeItem(vin, { price: 1 })], TEST_TOKEN));
-  assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { ok: true, updated: 0 });
+  assert.equal(response.status, 200, "a valid batch with a not-found item is still HTTP 200");
+  const json = await response.json();
+  assertEnvelopeInvariants(json);
+  assert.equal(json.ok, false, "vehicle_not_found is a FAILURE result, not a success");
+  assert.equal(json.updated, 0);
+  assert.equal(json.failed, 1);
+  assert.deepEqual(json.results, [{ carId: vin, success: false, action: "vehicle_not_found", error: "Vehicle was not found" }]);
 
   const untouched = await prisma.vehicle.findUnique({ where: { externalCarId: seededCarId } });
   assert.equal(Number(untouched!.price), 30000, "the seeded vehicle must be untouched");
@@ -367,7 +400,12 @@ test("PUT: does not create a vehicle for an unknown carId", async (t) => {
 
   const response = await PUT(buildRequest([completeItem(carId)], TEST_TOKEN));
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { ok: true, updated: 0 });
+  const json = await response.json();
+  assertEnvelopeInvariants(json);
+  assert.equal(json.ok, false);
+  assert.equal(json.updated, 0);
+  assert.equal(json.failed, 1);
+  assert.deepEqual(json.results, [{ carId, success: false, action: "vehicle_not_found", error: "Vehicle was not found" }]);
 
   const vehicle = await prisma.vehicle.findUnique({ where: { externalCarId: carId } });
   assert.equal(vehicle, null);
@@ -397,7 +435,15 @@ test("PUT: supports multiple cars in one request", async (t) => {
     ),
   );
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { ok: true, updated: 2 });
+  const json = await response.json();
+  assertEnvelopeInvariants(json);
+  assert.equal(json.ok, true);
+  assert.equal(json.total, 2);
+  assert.equal(json.updated, 2);
+  assert.deepEqual(json.results, [
+    { carId: carIdA, success: true, action: "updated", error: null },
+    { carId: carIdB, success: true, action: "updated", error: null },
+  ]);
 
   const vehicleA = await prisma.vehicle.findUnique({ where: { externalCarId: carIdA } });
   const vehicleB = await prisma.vehicle.findUnique({ where: { externalCarId: carIdB } });
@@ -535,7 +581,9 @@ test("PUT: ExtrasDTO fully replaces the previous extras collection", async (t) =
     ),
   );
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { ok: true, updated: 1 });
+  const json = await response.json();
+  assertEnvelopeInvariants(json);
+  assert.deepEqual(json.results, [{ carId, success: true, action: "updated", error: null }]);
 
   const extras = await prisma.vehicleExtra.findMany({ where: { vehicleId: vehicle.id } });
   assert.deepEqual(extras.map((e) => e.displayName).sort(), ["Navigation", "Panoramic roof"]);
@@ -592,4 +640,35 @@ test("PUT: scalar update and extras replacement are transactional (both land, or
   const updated = await prisma.vehicle.findUnique({ where: { externalCarId: carId }, include: { extras: true } });
   assert.equal(Number(updated!.price), 40000);
   assert.deepEqual(updated!.extras.map((e) => e.displayName), ["Panoramic roof"]);
+});
+
+// ---------- Mixed batch: success + vehicle_not_found ----------
+
+test("PUT: mixed batch (successful update + vehicle_not_found): HTTP 200, ok=false, the successful update stays applied, complete results returned", async (t) => {
+  withApiKey(t);
+  if (await skipIfDbUnreachable(t)) return;
+
+  const foundCarId = "carstock-put-mixed-found-1";
+  const missingCarId = "carstock-put-mixed-missing-1";
+  t.after(() => cleanupVehicle(foundCarId));
+  await cleanupVehicle(foundCarId);
+  await seedVehicle(foundCarId);
+
+  const response = await PUT(
+    buildRequest([completeItem(foundCarId, { price: 42000 }), completeItem(missingCarId)], TEST_TOKEN),
+  );
+  assert.equal(response.status, 200, "a per-item not-found inside a valid batch is still HTTP 200");
+  const json = await response.json();
+  assertEnvelopeInvariants(json);
+  assert.equal(json.ok, false);
+  assert.equal(json.total, 2);
+  assert.equal(json.updated, 1);
+  assert.equal(json.failed, 1);
+  assert.deepEqual(json.results, [
+    { carId: foundCarId, success: true, action: "updated", error: null },
+    { carId: missingCarId, success: false, action: "vehicle_not_found", error: "Vehicle was not found" },
+  ]);
+
+  const updated = await prisma.vehicle.findUnique({ where: { externalCarId: foundCarId } });
+  assert.equal(Number(updated!.price), 42000, "the successful update in the same batch must remain committed");
 });

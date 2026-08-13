@@ -8,7 +8,8 @@ import {
   type NormalizedExtraInput,
 } from "@/lib/vehicle-normalization";
 import type { VehicleAdminInput, VehicleAdminUpdateInput, VehicleFilterInput } from "@/lib/validators/vehicle.schema";
-import type { CarStockPayloadItem } from "@/lib/validators/carstock.schema";
+import { carStockRestoreItemSchema, type CarStockPayloadItem } from "@/lib/validators/carstock.schema";
+import { publishPublicRealtimeEvent, VEHICLE_CHANGE_SCOPES } from "@/server/realtime/publisher";
 
 export type VehicleWithImages = Vehicle & { images: VehicleImage[] };
 
@@ -334,12 +335,18 @@ export async function getAdminVehicleById(id: string) {
   return vehicle ? serializeVehicle(vehicle) : null;
 }
 
+// Publishes AFTER the mutation below has already committed — realtime is a
+// side effect of a successful write, never a precondition for one (see
+// publishPublicRealtimeEvent's own safety wrapper). This is the ONE
+// authoritative publish point for the admin single-Vehicle create flow —
+// the route (POST /api/admin/vehicles) does not also publish.
 export async function createVehicle(input: VehicleAdminInput) {
   const slug = await generateUniqueVehicleSlug({ maker: input.maker, model: input.model, yearRelease: input.yearRelease });
   const vehicle = await prisma.vehicle.create({
     data: { ...toVehicleData(input), slug },
     include: { images: true },
   });
+  publishPublicRealtimeEvent("vehicles.changed", VEHICLE_CHANGE_SCOPES);
   return serializeVehicle(vehicle);
 }
 
@@ -361,15 +368,20 @@ export async function updateVehicle(id: string, input: VehicleAdminUpdateInput) 
     data: { ...toVehicleUpdateData(input), slug },
     include: { images: { orderBy: { sortOrder: "asc" } } },
   });
+  publishPublicRealtimeEvent("vehicles.changed", VEHICLE_CHANGE_SCOPES);
   return serializeVehicle(vehicle);
 }
 
 export async function setVehicleFrozen(id: string, froze: boolean) {
-  return prisma.vehicle.update({ where: { id }, data: { froze } });
+  const vehicle = await prisma.vehicle.update({ where: { id }, data: { froze } });
+  publishPublicRealtimeEvent("vehicles.changed", VEHICLE_CHANGE_SCOPES);
+  return vehicle;
 }
 
 export async function softDeleteVehicle(id: string) {
-  return prisma.vehicle.update({ where: { id }, data: { isDeleted: true } });
+  const vehicle = await prisma.vehicle.update({ where: { id }, data: { isDeleted: true } });
+  publishPublicRealtimeEvent("vehicles.changed", VEHICLE_CHANGE_SCOPES);
+  return vehicle;
 }
 
 function toVehicleData(input: VehicleAdminInput): Prisma.VehicleUncheckedCreateInput {
@@ -437,13 +449,19 @@ function toVehicleUpdateData(input: VehicleAdminUpdateInput): Prisma.VehicleUnch
 }
 
 // ---------- Images ----------
+//
+// A visitor currently viewing this Vehicle's public gallery should see it
+// refreshed naturally once the mutation below commits — publishing
+// vehicles.changed here (rather than inventing a dedicated image event) is
+// deliberate: the realtime layer only needs to say "this Vehicle's public
+// data changed", not describe which field changed.
 
 export async function addVehicleImage(vehicleId: string, url: string, opts?: { alt?: string; isMain?: boolean }) {
   const count = await prisma.vehicleImage.count({ where: { vehicleId } });
   if (opts?.isMain || count === 0) {
     await prisma.vehicleImage.updateMany({ where: { vehicleId }, data: { isMain: false } });
   }
-  return prisma.vehicleImage.create({
+  const image = await prisma.vehicleImage.create({
     data: {
       vehicleId,
       url,
@@ -452,10 +470,14 @@ export async function addVehicleImage(vehicleId: string, url: string, opts?: { a
       sortOrder: count,
     },
   });
+  publishPublicRealtimeEvent("vehicles.changed", VEHICLE_CHANGE_SCOPES);
+  return image;
 }
 
 export async function removeVehicleImage(vehicleId: string, imageId: string) {
-  return prisma.vehicleImage.delete({ where: { id: imageId } }).catch(() => null);
+  const removed = await prisma.vehicleImage.delete({ where: { id: imageId } }).catch(() => null);
+  if (removed) publishPublicRealtimeEvent("vehicles.changed", VEHICLE_CHANGE_SCOPES);
+  return removed;
 }
 
 export async function reorderVehicleImages(vehicleId: string, orderedImageIds: string[]) {
@@ -464,6 +486,7 @@ export async function reorderVehicleImages(vehicleId: string, orderedImageIds: s
       prisma.vehicleImage.update({ where: { id }, data: { sortOrder: index } }),
     ),
   );
+  publishPublicRealtimeEvent("vehicles.changed", VEHICLE_CHANGE_SCOPES);
 }
 
 // ---------- External stock integration ----------
@@ -500,42 +523,74 @@ export function isPrismaP2002(error: unknown): error is Prisma.PrismaClientKnown
 }
 
 /**
- * CarStock CREATE (POST /api/integrations/carstock/cars-updated). STRICT
- * create-only: a brand-new externalCarId is created (with its ExtrasDTO
- * persisted as VehicleExtra rows, atomically); a carId that already exists
- * is left completely untouched — no scalar field, VIN, froze flag, extras,
- * image, or admin/SEO field is ever modified by this path. Updating an
- * existing vehicle is exclusively PUT's job (see applyCarStockFullUpdate
- * below) — CREATE has no update responsibility at all anymore, partial or
- * otherwise.
+ * CarStock CREATE / SKIP / RESTORE (POST /api/integrations/carstock/cars-updated).
  *
- * Deletion is likewise not a responsibility of this path — CarStock's old
- * `{carId, delete: true}` flag is validated but never read here; soft-deletes
- * go exclusively through DELETE /api/integrations/carstock/cars-delete.
+ * - externalCarId does NOT exist -> CREATE (unchanged from before: a brand-new
+ *   row is created, with its ExtrasDTO persisted as VehicleExtra rows,
+ *   atomically).
+ * - externalCarId exists AND isDeleted=false -> SKIP. Left completely
+ *   untouched — no scalar field, VIN, froze flag, extras, image, or
+ *   admin/SEO field is ever modified. Updating an *active* existing vehicle
+ *   is exclusively PUT's job (see applyCarStockFullUpdate below).
+ * - externalCarId exists AND isDeleted=true -> RESTORE, but ONLY when the
+ *   incoming item is the COMPLETE current CarStock state — gated by
+ *   carStockRestoreItemSchema (see carstock.schema.ts), the exact same
+ *   field-by-field strictness PUT already enforces (required non-blank
+ *   maker/model/versionName, every other CarStock-owned field present —
+ *   value may be `null`, key may not be missing — and ExtrasDTO present as
+ *   an actual array). An item that fails this check is rejected as
+ *   `restore_rejected` and leaves the Vehicle completely untouched —
+ *   RESTORE never means "just flip isDeleted", so an incomplete payload
+ *   must never reactivate the row. When it passes: reuses the same Vehicle
+ *   row rather than creating a second one for the same externalCarId (see
+ *   restoreVehicleFromCarStock below) — a vehicle soft-deleted via POST
+ *   /cars-delete can be brought back by sending its full current state
+ *   through this same CREATE endpoint again.
+ *
+ * The old `{carId, delete: true}` flag is validated but never read here;
+ * soft-deletes go exclusively through POST /api/integrations/carstock/cars-delete.
  *
  * The findUnique check above is the normal control-flow path for "this carId
- * already exists". It is not race-proof by itself: two overlapping requests
- * (or a retried request) for the same brand-new carId can both pass it
- * before either commits its create — and, since both would then also
- * generate the same slug, a losing request's create can fail with P2002 on
- * *either* `externalCarId` or `slug`, depending on which constraint Postgres
- * happens to report. Trusting `error.meta.target` to tell them apart would
- * make this depend on database/index ordering, so instead: on any P2002, run
- * one fresh, authoritative lookup on `externalCarId` alone. If it now
- * exists, this was another request winning the exact same CarStock vehicle
- * — treat it exactly like a pre-existing carId (`skipped`), never a failure
- * and never a hidden update. If it still doesn't exist, the P2002 was caused
- * by something else entirely (e.g. a genuine slug collision unrelated to
- * this carId) and must not be swallowed — the original error is rethrown.
- * The failed transaction has already rolled back by this point, so no
- * partial Vehicle/VehicleExtra state is ever left behind either way.
+ * already exists". It is not race-proof by itself for the genuinely-new-carId
+ * case: two overlapping requests (or a retried request) for the same
+ * brand-new carId can both pass it before either commits its create — and,
+ * since both would then also generate the same slug, a losing request's
+ * create can fail with P2002 on *either* `externalCarId` or `slug`,
+ * depending on which constraint Postgres happens to report. Trusting
+ * `error.meta.target` to tell them apart would make this depend on
+ * database/index ordering, so instead: on any P2002, run one fresh,
+ * authoritative lookup on `externalCarId` alone. If it now exists, this was
+ * another request winning the exact same CarStock vehicle — treat it
+ * exactly like a pre-existing carId (`skipped`), never a failure and never a
+ * hidden update. If it still doesn't exist, the P2002 was caused by
+ * something else entirely (e.g. a genuine slug collision unrelated to this
+ * carId) and must not be swallowed — the original error is rethrown. The
+ * failed transaction has already rolled back by this point, so no partial
+ * Vehicle/VehicleExtra state is ever left behind either way.
  */
 export async function createVehicleFromCarStock(raw: CarStockPayloadItem) {
   const externalCarId = String(raw.carId);
 
-  const existing = await prisma.vehicle.findUnique({ where: { externalCarId }, select: { id: true } });
+  const existing = await prisma.vehicle.findUnique({
+    where: { externalCarId },
+    select: { id: true, isDeleted: true, maker: true, model: true, yearRelease: true, slug: true },
+  });
+
   if (existing) {
-    return { action: "skipped" as const };
+    if (!existing.isDeleted) {
+      return { action: "skipped" as const };
+    }
+
+    const restoreValidation = carStockRestoreItemSchema.safeParse(raw);
+    if (!restoreValidation.success) {
+      return {
+        action: "restore_rejected" as const,
+        reason: restoreValidation.error.issues[0]?.message ?? "incomplete restore payload",
+      };
+    }
+
+    await restoreVehicleFromCarStock(existing, raw);
+    return { action: "restored" as const };
   }
 
   const normalized = normalizeVehiclePayload(raw);
@@ -572,6 +627,83 @@ export async function createVehicleFromCarStock(raw: CarStockPayloadItem) {
   }
 
   return { action: "created" as const };
+}
+
+/**
+ * CarStock RESTORE — reached only from createVehicleFromCarStock above, and
+ * only after the incoming item has already passed carStockRestoreItemSchema
+ * (the complete-current-state strictness gate — see carstock.schema.ts and
+ * the caller). Reactivates the SAME Vehicle row rather than creating a
+ * second one:
+ *
+ * - isDeleted -> false
+ * - every CarStock-owned scalar field refreshed from the incoming payload,
+ *   using the exact same field set (and normalization) as applyCarStockFullUpdate
+ *   (PUT) below: maker/model/versionName/yearRelease/price/monthlyPrice
+ *   (rent)/km/cc/hp/fuel/transmissionType/color/typeOfCar/vin/slug.
+ * - ExtrasDTO fully replaces the existing VehicleExtra rows (same
+ *   replaceVehicleExtras helper PUT and CREATE both use).
+ *
+ * All three of the above happen inside one `prisma.$transaction`, so a
+ * failed extras replacement can never leave the vehicle partially restored.
+ *
+ * Deliberately does NOT touch: froze, offer, plate, discountType, VehicleImage,
+ * description, seoTitle, seoDescription, features, leads, or any other
+ * admin-managed data. `froze` in particular is intentionally excluded even
+ * though the incoming CarStock item may carry a `froze` value (CREATE reads
+ * it for a brand-new row's *initial* state) — once a Vehicle row exists,
+ * `froze` is owned exclusively by the separate admin mechanism
+ * (PATCH /api/admin/vehicles/[id]/freeze -> setVehicleFrozen), exactly as PUT
+ * already established by never including `froze` in its own update `data`.
+ * RESTORE reactivating a row must not silently un-freeze (or freeze) it.
+ */
+async function restoreVehicleFromCarStock(
+  existing: { id: string; maker: string; model: string; yearRelease: number | null; slug: string },
+  raw: CarStockPayloadItem,
+) {
+  const normalized = normalizeVehiclePayload(raw);
+  const extras = normalizeExtras(raw.extras);
+
+  // Guaranteed non-null: carStockRestoreItemSchema requires maker/model/
+  // versionName to be present, trimmed, non-empty strings before this
+  // function is ever reached — same guarantee applyCarStockFullUpdate (PUT)
+  // relies on from carStockUpdateItemSchema. No fallback values (never
+  // "Άγνωστο", never the externalCarId) — an item that couldn't supply real
+  // values here would have already been rejected as `restore_rejected`.
+  const maker = normalized.maker!;
+  const model = normalized.model!;
+  const versionName = normalized.versionName!;
+  const yearRelease = normalized.yearRelease;
+
+  const significantChange =
+    maker !== existing.maker || model !== existing.model || yearRelease !== existing.yearRelease;
+  const slug = significantChange
+    ? await generateUniqueVehicleSlug({ maker, model, yearRelease }, existing.id)
+    : existing.slug;
+
+  const data: Prisma.VehicleUncheckedUpdateInput = {
+    isDeleted: false,
+    maker,
+    model,
+    versionName,
+    yearRelease,
+    price: normalized.price,
+    monthlyPrice: normalized.monthlyPrice,
+    km: normalized.km,
+    cc: normalized.cc,
+    hp: normalized.hp,
+    fuel: normalized.fuel,
+    transmissionType: normalized.transmissionType,
+    color: normalized.color,
+    typeOfCar: normalized.typeOfCar,
+    vin: normalized.vin,
+    slug,
+  };
+
+  await prisma.$transaction(async (tx) => {
+    await tx.vehicle.update({ where: { id: existing.id }, data });
+    await replaceVehicleExtras(tx, existing.id, extras);
+  });
 }
 
 /**
@@ -640,23 +772,56 @@ export async function applyCarStockFullUpdate(raw: CarStockPayloadItem) {
   return { action: "updated" as const };
 }
 
+export type CarStockDeleteOutcome = "deleted" | "already_deleted" | "not_found";
+
 /**
- * CarStock DELETE (DELETE /api/integrations/carstock/cars-delete). Bulk,
- * idempotent soft-delete keyed on carId -> externalCarId only (never VIN):
+ * CarStock DELETE (POST /api/integrations/carstock/cars-delete — POST, not
+ * HTTP DELETE, since the external CMS has unreliable support for a JSON body
+ * on a DELETE request; the operation itself is still a pure soft delete).
+ * Bulk, idempotent soft-delete keyed on carId -> externalCarId only (never VIN):
  * flips `isDeleted` for every matching, not-yet-deleted vehicle in one
  * `updateMany`, never calls `prisma.vehicle.delete`, and never touches
  * VehicleExtra/VehicleImage/leads or any other relation. Unknown carIds
- * simply match zero rows — no vehicle is ever created here. The returned
- * count is only the vehicles newly flipped from false -> true, so resending
- * the same carIds is always safe.
+ * simply match zero rows — no vehicle is ever created here.
+ *
+ * The CarStock response contract now needs a truthful per-carId outcome
+ * (deleted / already_deleted / not_found — see import.service.ts's
+ * processCarStockDelete), which a single blind `updateMany` count can't
+ * provide on its own. This stays a set-based, non-N+1 read-then-write pair
+ * rather than a per-item loop: one `findMany` snapshots which of the
+ * requested externalCarIds exist and their current `isDeleted`, then one
+ * `updateMany` performs the actual mutation exactly as before. There's a
+ * narrow window between the read and the write where a concurrent request
+ * could soft-delete the same vehicle first — in that case this call's
+ * reported label for that one carId (`deleted` vs `already_deleted`) can be
+ * stale by a request, but the mutation itself is unaffected (Postgres still
+ * applies it correctly and idempotently) and no vehicle is ever left in an
+ * inconsistent or double-mutated state; resending the same carIds is always
+ * safe regardless.
  */
-export async function softDeleteVehiclesByExternalCarIds(externalCarIds: string[]) {
-  if (externalCarIds.length === 0) return { count: 0 };
+export async function softDeleteVehiclesByExternalCarIds(
+  externalCarIds: string[],
+): Promise<{ count: number; outcomes: Map<string, CarStockDeleteOutcome> }> {
+  const outcomes = new Map<string, CarStockDeleteOutcome>();
+  if (externalCarIds.length === 0) return { count: 0, outcomes };
+
+  const existing = await prisma.vehicle.findMany({
+    where: { externalCarId: { in: externalCarIds } },
+    select: { externalCarId: true, isDeleted: true },
+  });
+  const isDeletedByExternalCarId = new Map(existing.map((v) => [v.externalCarId!, v.isDeleted]));
+
+  for (const externalCarId of externalCarIds) {
+    const isDeleted = isDeletedByExternalCarId.get(externalCarId);
+    outcomes.set(externalCarId, isDeleted === undefined ? "not_found" : isDeleted ? "already_deleted" : "deleted");
+  }
+
   const result = await prisma.vehicle.updateMany({
     where: { externalCarId: { in: externalCarIds }, isDeleted: false },
     data: { isDeleted: true },
   });
-  return { count: result.count };
+
+  return { count: result.count, outcomes };
 }
 
 function stockDataFromNormalized(normalized: NormalizedVehicleInput) {

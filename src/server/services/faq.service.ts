@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { publishPublicRealtimeEvent } from "@/server/realtime/publisher";
 
 export async function listActiveFaqItems() {
   return prisma.faqItem.findMany({
@@ -12,16 +13,22 @@ export async function listAllFaqItems() {
 }
 
 export async function createFaqItem(data: { question: string; answer: string; category?: string; sortOrder?: number }) {
-  return prisma.faqItem.create({ data });
+  const item = await prisma.faqItem.create({ data });
+  publishPublicRealtimeEvent("faq.changed", ["faq"]);
+  return item;
 }
 
 export async function updateFaqItem(
   id: string,
   data: Partial<{ question: string; answer: string; category: string; sortOrder: number; isActive: boolean }>,
 ) {
-  return prisma.faqItem.update({ where: { id }, data });
+  const item = await prisma.faqItem.update({ where: { id }, data });
+  publishPublicRealtimeEvent("faq.changed", ["faq"]);
+  return item;
 }
 
 export async function deleteFaqItem(id: string) {
-  return prisma.faqItem.delete({ where: { id } });
+  const item = await prisma.faqItem.delete({ where: { id } });
+  publishPublicRealtimeEvent("faq.changed", ["faq"]);
+  return item;
 }

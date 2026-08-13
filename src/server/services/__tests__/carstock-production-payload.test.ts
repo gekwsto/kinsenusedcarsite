@@ -174,5 +174,8 @@ test("route: the exact production payload, with a valid Bearer token, returns {o
 
   const response = await POST(buildRequest([PRODUCTION_PAYLOAD]));
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { ok: true, added: 1 });
+  const json = await response.json();
+  assert.equal(json.ok, true);
+  assert.equal(json.added, 1);
+  assert.deepEqual(json.results, [{ carId: PRODUCTION_PAYLOAD.carId, success: true, action: "created", error: null }]);
 });

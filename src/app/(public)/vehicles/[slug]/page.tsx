@@ -42,6 +42,13 @@ export async function generateMetadata({ params }: { params: Promise<PageParams>
 
 export default async function VehicleDetailPage({ params }: { params: Promise<PageParams> }) {
   const { slug } = await params;
+  // Test-only hook for exercising the recoverable error.tsx boundary in a
+  // real browser (see tests/e2e/public-status-states.spec.ts) — inert
+  // unless KINSEN_E2E_TEST_TRIGGERS is explicitly set, which playwright.config.ts
+  // only does for its own spawned webServer, never in a real deployment.
+  if (process.env.KINSEN_E2E_TEST_TRIGGERS === "1" && slug === "__e2e_trigger_error__") {
+    throw new Error("E2E test-only trigger for the recoverable error boundary");
+  }
   const vehicle = await getPublicVehicleBySlug(slug);
   if (!vehicle) notFound();
 

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { CONTENT_DEFAULTS, type ContentKey, type ContentValue } from "@/lib/content-defaults";
+import { publishPublicRealtimeEvent, CONTENT_KEY_SCOPE_MAP } from "@/server/realtime/publisher";
 
 // Shallow-merges a stored override on top of the section's defaults rather
 // than trusting the stored row's shape outright — an override saved before
@@ -27,14 +28,25 @@ export async function getAllPageContent(): Promise<Record<ContentKey, unknown>> 
   return result;
 }
 
+// The image-staging upload route (POST /api/admin/content/[key]/image)
+// deliberately never calls this — it only returns a URL for the editor's
+// unsaved form state (see that route's own comment). This is the ONLY
+// place a section's PageContent actually becomes public, which is exactly
+// why it's the right (and only) place to publish content.changed for it.
 export async function updatePageContent<K extends ContentKey>(key: K, value: ContentValue<K>) {
-  return prisma.pageContent.upsert({
+  const row = await prisma.pageContent.upsert({
     where: { key },
     update: { value: value as object },
     create: { key, value: value as object },
   });
+  publishPublicRealtimeEvent("content.changed", [CONTENT_KEY_SCOPE_MAP[key]]);
+  return row;
 }
 
 export async function resetPageContent(key: ContentKey) {
-  return prisma.pageContent.delete({ where: { key } }).catch(() => null);
+  const deleted = await prisma.pageContent.delete({ where: { key } }).catch(() => null);
+  // Only publish if an override actually existed and was removed — resetting
+  // a key that already had no override changes nothing publicly visible.
+  if (deleted) publishPublicRealtimeEvent("content.changed", [CONTENT_KEY_SCOPE_MAP[key]]);
+  return deleted;
 }

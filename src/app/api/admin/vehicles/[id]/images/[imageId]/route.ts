@@ -5,6 +5,7 @@ import { handleApiError } from "@/lib/api-error";
 import { removeUploadedImage } from "@/lib/images";
 import { removeVehicleImage } from "@/server/services/vehicle.service";
 import { prisma } from "@/lib/prisma";
+import { publishPublicRealtimeEvent, VEHICLE_CHANGE_SCOPES } from "@/server/realtime/publisher";
 
 const setMainSchema = z.object({ isMain: z.literal(true) });
 
@@ -29,6 +30,11 @@ export async function PATCH(
       await tx.vehicleImage.updateMany({ where: { vehicleId: id }, data: { isMain: false } });
       return tx.vehicleImage.update({ where: { id: imageId }, data: { isMain: true } });
     });
+
+    // No dedicated vehicle.service.ts function exists for "set main image"
+    // (see the comment above) — this route IS the single mutation point for
+    // this flow, so it's the correct (and only) place to publish.
+    publishPublicRealtimeEvent("vehicles.changed", VEHICLE_CHANGE_SCOPES);
 
     return NextResponse.json(image);
   } catch (error) {

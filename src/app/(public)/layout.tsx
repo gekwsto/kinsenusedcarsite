@@ -1,6 +1,7 @@
 import { FavoritesProvider } from "@/components/providers/favorites-provider";
 import { CookieConsentProvider } from "@/components/providers/cookie-consent-provider";
 import { VehicleComparisonProvider } from "@/components/providers/vehicle-comparison-provider";
+import { PublicRealtimeProvider } from "@/components/providers/public-realtime-provider";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { CookieBanner } from "@/components/cookie-consent/cookie-banner";
@@ -30,6 +31,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
           <CookiePreferencesModal />
           <ConsentScriptGate />
           <VehicleComparisonTray />
+          <PublicRealtimeProvider />
         </VehicleComparisonProvider>
       </CookieConsentProvider>
     </FavoritesProvider>

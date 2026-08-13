@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { signIn, getSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useNavigationTransition } from "@/components/providers/navigation-transition-provider";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { KINSEN_GLOW_SURFACE_CLASSNAME, KinsenGlowOverlay } from "@/components/ui/kinsen-glow-button";
 import { Input } from "@/components/ui/input";
@@ -69,7 +69,7 @@ export function LoginForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 rounded-card border border-border bg-white p-6 shadow-soft">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
       {registered && (
         <p className="rounded-lg bg-accent/10 px-3 py-2 text-sm text-accent-dark">
           Ο λογαριασμός σας δημιουργήθηκε επιτυχώς. Συνδεθείτε για να συνεχίσετε.
@@ -78,18 +78,34 @@ export function LoginForm() {
 
       <div className="space-y-1.5">
         <Label htmlFor="login-email">Email</Label>
-        <Input id="login-email" type="email" autoComplete="email" {...register("email")} />
+        <div className="relative">
+          <Mail
+            aria-hidden="true"
+            className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted"
+          />
+          <Input
+            id="login-email"
+            type="email"
+            autoComplete="email"
+            className="pl-10 focus-visible:ring-accent/40"
+            {...register("email")}
+          />
+        </div>
         {errors.email && <p className="text-xs text-red-600">{errors.email.message}</p>}
       </div>
 
       <div className="space-y-1.5">
         <Label htmlFor="login-password">Κωδικός</Label>
         <div className="relative">
+          <Lock
+            aria-hidden="true"
+            className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted"
+          />
           <Input
             id="login-password"
             type={showPassword ? "text" : "password"}
             autoComplete="current-password"
-            className="pr-10"
+            className="pl-10 pr-10 focus-visible:ring-accent/40"
             {...register("password")}
           />
           <button
@@ -111,9 +127,12 @@ export function LoginForm() {
             Να με θυμάσαι
           </Label>
         </div>
-        <a href="#" className="text-sm text-primary hover:underline">
+        <span
+          aria-disabled="true"
+          className="text-sm text-ink-muted cursor-not-allowed select-none"
+        >
           Ξεχάσατε τον κωδικό;
-        </a>
+        </span>
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}

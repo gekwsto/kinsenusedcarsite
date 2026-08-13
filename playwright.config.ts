@@ -54,6 +54,10 @@ export default defineConfig({
     // own callback/session URLs, never credential/session/CSRF validation.
     // Scoped to this spawned test-server process only; not a change to
     // auth.ts or .env, and not in effect for `npm run dev`/`npm start` normally.
-    env: { AUTH_TRUST_HOST: "true" },
+    // KINSEN_E2E_TEST_TRIGGERS enables a single inert-by-default hook in
+    // vehicles/[slug]/page.tsx (see that file) so public-status-states.spec.ts
+    // can exercise the recoverable error.tsx boundary against a real
+    // production build — never set for an actual deployment.
+    env: { AUTH_TRUST_HOST: "true", KINSEN_E2E_TEST_TRIGGERS: "1" },
   },
 });

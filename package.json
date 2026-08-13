@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "node --env-file-if-exists=.env --import tsx --test src/server/services/__tests__/**/*.test.ts",
+    "test": "node --env-file-if-exists=.env --import tsx --test --test-concurrency=1 src/server/services/__tests__/**/*.test.ts src/server/realtime/__tests__/**/*.test.ts src/lib/realtime/__tests__/**/*.test.ts",
     "test:e2e": "playwright test",
     "test:e2e:all": "PLAYWRIGHT_FIREFOX=1 PLAYWRIGHT_WEBKIT=1 playwright test",
     "test:e2e:headed": "playwright test --headed",

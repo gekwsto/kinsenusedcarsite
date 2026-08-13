@@ -246,8 +246,8 @@ test("processCarStockPayload: end-to-end create via the exact real payload, thro
   const result = await processCarStockPayload(parsed, "carstock");
   importLogId = result.log.id;
 
-  assert.equal(result.createdCount, 1);
-  assert.equal(result.skippedCount, 0);
+  assert.equal(result.added, 1);
+  assert.equal(result.skipped, 0);
   assert.equal(result.errors.length, 0);
   assert.equal(result.log.status, "SUCCESS");
   assert.equal(result.log.createdCount, 1);
@@ -284,8 +284,8 @@ test("processCarStockPayload: a batch of a new carId + an already-existing carId
   const result = await processCarStockPayload(parsed, "carstock");
   importLogId = result.log.id;
 
-  assert.equal(result.createdCount, 1);
-  assert.equal(result.skippedCount, 1);
+  assert.equal(result.added, 1);
+  assert.equal(result.skipped, 1);
   assert.equal(result.log.createdCount, 1);
   assert.equal(result.log.skippedCount, 1);
   assert.equal(result.log.updatedCount, 0, "a skipped duplicate must never be counted as an update");
@@ -313,8 +313,8 @@ test("processCarStockPayload: a carId repeated twice in the same batch creates o
   const result = await processCarStockPayload(parsed, "carstock");
   importLogId = result.log.id;
 
-  assert.equal(result.createdCount, 1);
-  assert.equal(result.skippedCount, 1);
+  assert.equal(result.added, 1);
+  assert.equal(result.skipped, 1);
   assert.equal(result.log.skippedCount, 1);
   assert.equal(result.log.updatedCount, 0);
 
@@ -419,8 +419,8 @@ test("processCarStockPayload: two concurrent POST batches for the same new carId
   logIdA = resultA.log.id;
   logIdB = resultB.log.id;
 
-  assert.equal(resultA.createdCount + resultB.createdCount, 1, "exactly one of the two concurrent batches creates the vehicle");
-  assert.equal(resultA.skippedCount + resultB.skippedCount, 1, "the other batch records the duplicate as skipped");
+  assert.equal(resultA.added + resultB.added, 1, "exactly one of the two concurrent batches creates the vehicle");
+  assert.equal(resultA.skipped + resultB.skipped, 1, "the other batch records the duplicate as skipped");
   assert.equal(resultA.log.updatedCount, 0);
   assert.equal(resultB.log.updatedCount, 0, "a concurrent duplicate must never be counted as an update");
 
