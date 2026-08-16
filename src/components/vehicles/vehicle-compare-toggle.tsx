@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Scale } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { buttonVariants } from "@/components/ui/button";
 import { useVehicleComparison } from "@/components/providers/vehicle-comparison-provider";
 import type { VehicleComparisonSummary } from "@/lib/vehicle-comparison";
 
@@ -54,13 +55,18 @@ export function VehicleCompareToggle({ vehicle, className, size = "md", showLabe
         "group relative inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
         showLabel
           ? [
-              // Corporate outlined button: a fixed 1px border at all times
-              // (only its *color* changes on hover, so the border never
-              // appears/disappears and never shifts layout), a shadow subtle
-              // enough to sit next to the bold `shadow-[0_8px_18px_...]`
-              // Leasing CTA without competing with it, and color-only
-              // transitions (no scale/transform) so hovering never nudges
-              // surrounding layout.
+              // Reuses the shared `Button` "outline" variant's own CSS
+              // (buttonVariants) as its base — the same shared button
+              // system as every other premium CTA on the site — rather
+              // than a fully one-off class string, then layers on only the
+              // behavior this control actually needs on top: an
+              // always-present 1px border (only its *color* changes on
+              // hover, so the border never appears/disappears and never
+              // shifts layout), a restrained navy hover/active treatment
+              // (never cyan — the comparison control stays in the same
+              // deep-navy family as every other primary interaction), and
+              // color-only transitions (no scale/transform) so hovering
+              // never nudges surrounding layout.
               // Tighter padding below `sm:` — at the narrowest phone widths
               // (~320px) the title + this button + the favorite button all
               // share one row (see vehicle-pricing-section.tsx), and the
@@ -68,12 +74,13 @@ export function VehicleCompareToggle({ vehicle, className, size = "md", showLabe
               // row into horizontal overflow (measured: 13px past a 320px
               // viewport). px-3 reclaims exactly that without touching the
               // roomier tablet/desktop treatment.
-              "h-11 gap-1.5 rounded-lg border border-[#dfe8ed] bg-white px-3 text-sm font-bold text-ink shadow-soft transition-[color,background-color,border-color,box-shadow] duration-200 ease-out motion-reduce:transition-none sm:gap-2 sm:px-5",
-              "hover:border-detail/40 hover:bg-detail/[0.06] hover:shadow-card",
-              active && "border-detail/50 bg-detail/[0.08]",
+              buttonVariants({ variant: "outline", size: "md" }),
+              "h-11 gap-1.5 px-3 font-bold shadow-soft transition-[color,background-color,border-color,box-shadow] duration-200 ease-out motion-reduce:transition-none sm:gap-2 sm:px-5",
+              "hover:border-primary/30 hover:bg-primary/5 hover:shadow-card",
+              active && "border-primary/40 bg-primary/[0.08]",
             ]
           : [
-              "rounded-full bg-white/90 shadow-soft backdrop-blur transition-transform hover:scale-105",
+              "rounded-full bg-white/90 shadow-soft backdrop-blur transition-[transform,background-color] duration-200 ease-out hover:scale-105 hover:bg-primary/5 motion-reduce:transition-none",
               size === "sm" ? "h-8 w-8" : "h-10 w-10",
               active && "bg-primary/10",
             ],
@@ -83,16 +90,20 @@ export function VehicleCompareToggle({ vehicle, className, size = "md", showLabe
       <Scale
         className={cn(
           size === "sm" ? "h-4 w-4" : "h-5 w-5",
-          active ? (showLabel ? "text-detail" : "text-primary") : "text-ink-muted",
-          showLabel && !active && "transition-colors duration-200 ease-out group-hover:text-detail motion-reduce:transition-none",
+          active ? "text-primary" : "text-ink-muted",
+          // Comparison never turns cyan — hover and the selected state both
+          // stay inside the deep-navy family, only Favorite's liked state
+          // uses cyan.
+          showLabel && !active && "transition-colors duration-200 ease-out group-hover:text-primary motion-reduce:transition-none",
+          !showLabel && !active && "transition-colors duration-200 ease-out hover:text-primary motion-reduce:transition-none",
         )}
       />
       {showLabel && (
         <span
           className={cn(
             active
-              ? "text-detail"
-              : "text-ink transition-colors duration-200 ease-out group-hover:text-detail motion-reduce:transition-none",
+              ? "text-primary"
+              : "text-ink transition-colors duration-200 ease-out group-hover:text-primary motion-reduce:transition-none",
           )}
         >
           {active ? "Στη σύγκριση" : "Σύγκριση"}

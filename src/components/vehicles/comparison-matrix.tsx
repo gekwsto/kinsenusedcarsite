@@ -3,8 +3,10 @@
 import * as React from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { X } from "lucide-react";
+import { X, ArrowLeft } from "lucide-react";
 import { NavigationLink as Link } from "@/components/navigation/navigation-link";
+import { Button } from "@/components/ui/button";
+import { KINSEN_CTA_BUTTON_CLASSNAME } from "@/components/ui/kinsen-cta-button";
 import { useVehicleComparison } from "@/components/providers/vehicle-comparison-provider";
 import { useNavigationTransition } from "@/components/providers/navigation-transition-provider";
 import { cn, formatEuro, formatKm, FALLBACK_VEHICLE_IMAGE } from "@/lib/utils";
@@ -198,9 +200,16 @@ export function ComparisonMatrix({ vehicles }: { vehicles: readonly ComparisonPa
       <p className="mt-3 text-xs text-ink-muted lg:hidden">Σύρετε οριζόντια για να δείτε όλα τα χαρακτηριστικά →</p>
 
       <div className="mt-8 text-center">
-        <Link href="/vehicles" className="text-sm font-semibold text-primary underline-offset-2 hover:underline">
-          Επιστροφή στα αυτοκίνητα
-        </Link>
+        {/* Same static Kinsen corporate CTA as "Σύνδεση" (see
+            kinsen-cta-button.tsx) — reused as-is, not reimplemented. */}
+        <Button asChild variant="primary" size="sm" className={cn(KINSEN_CTA_BUTTON_CLASSNAME, "rounded-md")}>
+          <Link href="/vehicles">
+            <span className="inline-flex items-center gap-1.5">
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+              Επιστροφή στα αυτοκίνητα
+            </span>
+          </Link>
+        </Button>
       </div>
     </div>
   );

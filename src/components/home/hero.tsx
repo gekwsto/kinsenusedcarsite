@@ -4,6 +4,16 @@ import { getPageContent } from "@/server/services/content.service";
 export async function Hero() {
   const content = await getPageContent("home.hero");
 
+  // Forces the subtitle onto exactly two intentional lines at its natural
+  // clause break (the first comma) instead of leaving it to the browser's
+  // own wrap point, which grew too wide at large viewports and could
+  // overlap the hero image's vehicle. Falls back to the whole string
+  // un-split if the content is ever edited to no longer contain a comma,
+  // so this never throws on unexpected CMS content.
+  const commaIndex = content.subtitle.indexOf(", ");
+  const subtitleLine1 = commaIndex === -1 ? content.subtitle : content.subtitle.slice(0, commaIndex + 1);
+  const subtitleLine2 = commaIndex === -1 ? null : content.subtitle.slice(commaIndex + 2);
+
   return (
     <div className="relative h-[70vh] min-h-[420px] w-full overflow-hidden">
       <Image
@@ -37,7 +47,8 @@ export async function Hero() {
             </div>
           </h1>
           <p className="mt-3 max-w-xs text-left text-base font-normal leading-snug text-navy drop-shadow-[0_1px_8px_rgba(0,0,0,0.08)] sm:mt-4 sm:max-w-sm sm:text-lg lg:mt-5 lg:max-w-md lg:text-xl xl:mt-6 xl:max-w-lg xl:text-2xl 2xl:max-w-2xl 2xl:text-3xl">
-            {content.subtitle}
+            <span className="block">{subtitleLine1}</span>
+            {subtitleLine2 && <span className="block">{subtitleLine2}</span>}
           </p>
         </div>
       </div>

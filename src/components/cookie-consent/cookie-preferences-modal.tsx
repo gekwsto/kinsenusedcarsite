@@ -6,7 +6,9 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
+import { KINSEN_CTA_BUTTON_CLASSNAME } from "@/components/ui/kinsen-cta-button";
 import { useCookieConsent } from "@/components/providers/cookie-consent-provider";
+import { cn } from "@/lib/utils";
 import type { CookieConsentState, OptionalCategorySelection } from "@/lib/cookie-consent";
 import {
   getConsentCategoryViewModels,
@@ -200,7 +202,9 @@ function ModalBody({
         <Button type="button" variant="ghost" onClick={() => onSave(draft)}>
           Αποθήκευση επιλογών
         </Button>
-        <Button type="button" variant="primary" onClick={onAcceptAll}>
+        {/* Same static Kinsen corporate CTA as "Σύνδεση" (see
+            kinsen-cta-button.tsx) — reused as-is, not reimplemented. */}
+        <Button type="button" variant="primary" onClick={onAcceptAll} className={cn(KINSEN_CTA_BUTTON_CLASSNAME, "rounded-md")}>
           Αποδοχή όλων
         </Button>
       </div>

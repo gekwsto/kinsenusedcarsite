@@ -36,7 +36,7 @@ export function FavoriteButton({ vehicleId, className, size = "md" }: FavoriteBu
       aria-label={active ? "Αφαίρεση από τα αγαπημένα" : "Προσθήκη στα αγαπημένα"}
       disabled={pending}
       className={cn(
-        "inline-flex items-center justify-center rounded-full bg-white/90 shadow-soft backdrop-blur transition-transform hover:scale-105 disabled:opacity-60",
+        "inline-flex items-center justify-center rounded-full bg-white/90 shadow-soft backdrop-blur transition-[transform,background-color] duration-200 ease-out hover:scale-105 hover:bg-primary/5 disabled:opacity-60 motion-reduce:transition-none",
         size === "sm" ? "h-8 w-8" : "h-10 w-10",
         className,
       )}
@@ -44,7 +44,14 @@ export function FavoriteButton({ vehicleId, className, size = "md" }: FavoriteBu
       <Heart
         className={cn(
           size === "sm" ? "h-4 w-4" : "h-5 w-5",
-          active ? "fill-favorite-active text-favorite-active" : "text-favorite-inactive",
+          "transition-colors duration-200 ease-out motion-reduce:transition-none",
+          // Cyan is reserved exclusively for the genuinely-liked state — a
+          // clear "this vehicle is in my Favorites" signal, never a hover
+          // decoration. Not-liked stays muted at rest and only shifts to
+          // deep navy on hover ("this is interactive"); once liked, hover
+          // only deepens the same teal family (never navy) so the liked
+          // identity is never lost mid-hover.
+          active ? "fill-accent text-accent hover:fill-accent-dark hover:text-accent-dark" : "text-favorite-inactive hover:text-primary",
         )}
       />
     </button>

@@ -177,7 +177,16 @@ export function VehicleCarousel({ vehicles }: { vehicles: VehicleCardVehicle[] }
       <div
         ref={trackRef}
         onScroll={handleScroll}
-        className="flex snap-x snap-mandatory gap-5 overflow-x-auto scroll-smooth pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden xl:gap-6 2xl:gap-7"
+        // `overflow-x-auto` forces the browser to compute `overflow-y` as
+        // `auto` too (any non-`visible` overflow-x does, per spec), which
+        // establishes a clipping context on this box — without headroom, a
+        // hovered card's soft `shadow-card` lift (see vehicle-card.tsx)
+        // gets its top edge cut flush against the track's own box. `py-2`
+        // (was `pb-2` only) gives it symmetric breathing room on both
+        // edges; purely vertical padding, so it has zero effect on the
+        // horizontal `offsetLeft`/`scrollLeft` math `scrollToIndex` above
+        // relies on.
+        className="flex snap-x snap-mandatory gap-5 overflow-x-auto scroll-smooth py-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden xl:gap-6 2xl:gap-7"
       >
         {vehicles.map((vehicle, i) => (
           <div key={vehicle.id} className="flex-none basis-full snap-start sm:basis-1/2 lg:basis-1/3 2xl:basis-1/4">

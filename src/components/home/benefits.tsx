@@ -1,6 +1,9 @@
 import Image from "next/image";
 import { NavigationLink as Link } from "@/components/navigation/navigation-link";
 import { getPageContent } from "@/server/services/content.service";
+import { Button } from "@/components/ui/button";
+import { KINSEN_CTA_BUTTON_CLASSNAME } from "@/components/ui/kinsen-cta-button";
+import { cn } from "@/lib/utils";
 
 export async function Benefits() {
   const content = await getPageContent("home.benefits");
@@ -22,12 +25,18 @@ export async function Benefits() {
               </div>
               <p className="mb-2 text-lg font-bold leading-snug text-primary">{card.title}</p>
               <p className="mb-4 flex-1 text-left text-base font-light leading-loose text-primary">{card.description}</p>
-              <Link
-                href="/vehicles"
-                className="w-fit rounded-full bg-footer px-10 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-accent hover:text-footer"
+              {/* Same static Kinsen corporate CTA as "Σύνδεση" (see
+                  kinsen-cta-button.tsx) — a larger content-section sizing
+                  of its own, same structured `rounded-md` family the rest
+                  of the CTA system uses. `w-fit` keeps it from stretching
+                  to the full width of this column-flex card. */}
+              <Button
+                asChild
+                variant="primary"
+                className={cn(KINSEN_CTA_BUTTON_CLASSNAME, "h-auto w-fit rounded-md px-8 py-3.5 text-sm sm:px-10 sm:text-[15px] lg:text-base")}
               >
-                Δείτε Περισσότερα
-              </Link>
+                <Link href="/vehicles">Δείτε Περισσότερα</Link>
+              </Button>
             </div>
           ))}
         </div>

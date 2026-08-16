@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { ShieldCheck } from "lucide-react";
+import { ShieldCheck, UserRound } from "lucide-react";
 import { LoginForm } from "@/components/forms/login-form";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 
 export const metadata: Metadata = {
   title: "Σύνδεση",
@@ -12,100 +12,55 @@ export const metadata: Metadata = {
 
 export default function LoginPage() {
   return (
-    // Full-width outer strip only supplies the page's own light background
-    // and the horizontal/vertical gutters around the bounded window below —
-    // it deliberately carries no border/shadow/rounding of its own, so the
-    // window reads as one self-contained surface floating on the page
-    // rather than a second nested frame.
-    <div className="w-full px-4 py-8 sm:px-6 lg:px-10 lg:py-10 xl:px-12 [@media(max-height:500px)]:py-4">
-      {/* The auth window: one bounded, rounded, shadowed surface — capped
-          well short of the viewport on desktop so the page's own
-          background stays visible on every side, and the shared Footer
-          (rendered by the layout right after this) stays a clearly
-          separate element rather than something this page visually
-          annexes. */}
-      <div className="relative mx-auto w-full max-w-[1480px] overflow-hidden rounded-[28px] border border-border/60 bg-surface shadow-[0_32px_64px_-24px_rgba(2,56,89,0.28),0_8px_20px_-8px_rgba(2,56,89,0.12)] lg:min-h-[600px]">
-        {/* Diagonal navy backdrop, desktop/tablet-large only. A single
-            clip-path–shaped absolute layer spanning the whole window (not
-            two panels whose edges must be kept in sync), clipped cleanly by
-            the window's own rounded corners via the parent's
-            overflow-hidden. Percentages (not px) keep the same relative
-            lean at every width.
-
-            This has to sit ABOVE the light column's own background for the
-            diagonal to actually read as a diagonal: the two are DOM
-            siblings with no z-index, so without `z-10` here the later
-            (lighter) column would simply paint over — and fully hide —
-            whatever this layer paints past the 50% mark. The right column
-            below is `lg:bg-transparent` for exactly this reason; the
-            window's own `bg-surface` is what shows through it instead,
-            everywhere this shape doesn't reach. Bottom of the gradient
-            reuses the shared Footer's own `footer` token (see
-            footer.tsx's `bg-gradient-to-b from-footer ...`) so this panel
-            and the Footer read as the same navy family without physically
-            touching or merging into it. */}
-        <div
-          aria-hidden="true"
-          className="absolute inset-0 z-10 hidden bg-gradient-to-b from-primary-dark to-footer lg:block"
-          style={{ clipPath: "polygon(0 0, 57% 0, 46% 100%, 0 100%)" }}
-        />
-
-        <div className="relative z-20 flex flex-col lg:min-h-[600px] lg:flex-row">
-          {/* Left — brand panel. Solid navy gradient on mobile/tablet (its
-              own background); cleared at lg+ so the diagonal layer above
-              supplies it instead. `lg:bg-none`, not `lg:bg-transparent` —
-              `bg-gradient-to-b` sets `background-image`, and Tailwind's
-              `bg-transparent` only resets `background-color`, so it was
-              leaving this column's own (same-colored, so invisible in the
-              upper portion) gradient painted underneath at every width,
-              silently flattening the diagonal's lower portion to a vertical
-              edge wherever the true diagonal receded past this column's
-              fixed 50% boundary. */}
-          <div className="relative flex flex-col overflow-hidden bg-gradient-to-b from-primary-dark to-footer px-6 py-12 sm:px-10 lg:w-1/2 lg:bg-none lg:px-16 lg:py-14 xl:px-20 [@media(max-height:500px)]:py-6">
-            <div className="flex flex-1 flex-col justify-center motion-safe:animate-[slide-up_450ms_ease-out_both] lg:-mt-4">
-              <h1 className="max-w-[410px] text-3xl font-bold leading-tight text-white sm:text-4xl [@media(max-height:500px)]:text-2xl">
-                Η διαδρομή σας ξεκινά από εδώ.
-              </h1>
-              <p className="mt-6 max-w-[420px] text-sm leading-relaxed text-white/70 sm:text-base [@media(max-height:500px)]:mt-3">
-                Ανακαλύψτε το αυτοκίνητο που σας ταιριάζει και κάντε το επόμενο βήμα με μια σύγχρονη, απλή και
-                αξιόπιστη εμπειρία Kinsen.
-              </p>
-            </div>
-          </div>
-
-          {/* Right — login card. Transparent at lg+ (see the diagonal layer's
-              comment above) so it stops opaquely covering the diagonal's
-              bleed past the 50% mark; the window's own bg-surface takes
-              over as the light backdrop instead, an identical color so
-              there's no seam between the two. */}
-          <div className="relative flex flex-1 items-center justify-center bg-surface px-6 py-12 sm:px-10 lg:bg-transparent lg:px-16 [@media(max-height:500px)]:py-6">
-            {/* Barely-there corporate depth — not decoration competing with
-                the form, just enough to keep the panel from reading flat. */}
-            <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-              <div className="absolute -top-16 right-6 h-64 w-64 rounded-full bg-accent/5 blur-3xl" />
-              <div className="absolute bottom-0 left-10 h-56 w-56 rounded-full bg-primary/5 blur-3xl" />
-            </div>
-
-            <div className="relative w-full max-w-[440px] motion-safe:animate-[slide-up_500ms_ease-out_120ms_both]">
-              <Card className="border-border/70 shadow-card">
-                <CardHeader className="p-6 pb-0 sm:p-8 sm:pb-0 [@media(max-height:500px)]:p-4 [@media(max-height:500px)]:pb-0">
-                  <CardTitle className="text-2xl font-bold text-primary">Καλώς ήρθατε ξανά</CardTitle>
-                  <p className="mt-1.5 text-sm text-ink-muted">Συνδεθείτε στον λογαριασμό σας</p>
-                </CardHeader>
-                <CardContent className="p-6 sm:p-8 [@media(max-height:500px)]:p-4">
-                  <Suspense>
-                    <LoginForm />
-                  </Suspense>
-                </CardContent>
-              </Card>
-
-              <p className="mt-5 flex items-center justify-center gap-1.5 text-xs text-ink-muted/80 [@media(max-height:500px)]:mt-3">
-                <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
-                Ασφάλεια δεδομένων
-              </p>
-            </div>
-          </div>
+    // Single-card, corporate-minimal auth layout — deliberately no split
+    // panel, no diagonal, no full-bleed navy surface. The page's own light
+    // background (inherited from the body — see globals.css) stays visible
+    // on every side, so this reads as one calm card floating on the site's
+    // normal background rather than a second, competing surface. Vertical
+    // padding gives breathing room under the navbar and above the shared
+    // Footer; the short-viewport override keeps things from ever feeling
+    // squeezed on small-height/landscape screens.
+    <div className="w-full px-4 py-10 sm:px-6 sm:py-14 lg:py-20 [@media(max-height:640px)]:py-6">
+      <div className="relative mx-auto flex w-full max-w-[440px] flex-col items-center">
+        {/* Extremely restrained ambient depth — one soft glow behind the
+            card, not a colored surface or gradient competing with it. */}
+        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 -z-10 flex justify-center">
+          <div className="h-64 w-64 rounded-full bg-primary/[0.06] blur-3xl" />
         </div>
+
+        <Card className="w-full rounded-2xl border-border/60 shadow-card motion-safe:animate-[slide-up_450ms_ease-out_both]">
+          <CardContent className="flex flex-col items-center p-6 text-center sm:p-8 lg:p-10 [@media(max-height:640px)]:p-5">
+            {/* The page's one bold brand anchor — a solid navy badge tying
+                to the navbar/CTA brand language — everything else stays
+                deliberately quiet. Scales per breakpoint via its own fixed
+                sizes rather than fluid units, so it never disturbs the
+                vertical rhythm of the title/subtitle below it. */}
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary shadow-soft sm:h-16 sm:w-16 lg:h-20 lg:w-20 [@media(max-height:640px)]:h-12 [@media(max-height:640px)]:w-12">
+              <UserRound
+                aria-hidden="true"
+                className="h-7 w-7 text-white sm:h-8 sm:w-8 lg:h-10 lg:w-10 [@media(max-height:640px)]:h-6 [@media(max-height:640px)]:w-6"
+              />
+            </div>
+
+            <h1 className="mt-5 text-2xl font-bold text-ink sm:text-3xl [@media(max-height:640px)]:mt-3 [@media(max-height:640px)]:text-xl">
+              Καλώς ήρθατε ξανά
+            </h1>
+            <p className="mt-1.5 text-sm text-ink-muted sm:text-base [@media(max-height:640px)]:mt-1">
+              Συνδεθείτε στον λογαριασμό σας
+            </p>
+
+            <div className="mt-7 w-full text-left [@media(max-height:640px)]:mt-4">
+              <Suspense>
+                <LoginForm />
+              </Suspense>
+            </div>
+          </CardContent>
+        </Card>
+
+        <p className="mt-6 flex items-center justify-center gap-1.5 text-xs text-ink-muted/80 [@media(max-height:640px)]:mt-3">
+          <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
+          Ασφάλεια δεδομένων
+        </p>
       </div>
     </div>
   );

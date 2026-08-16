@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
+import { FILTER_FOCUS_CLASS } from "@/components/vehicles/filter-typography";
 import type { LucideIcon } from "lucide-react";
 
 // One shared visual/interaction primitive for every full-width toggle
@@ -34,10 +35,10 @@ export function FilterToggleButton({
       onClick={onToggle}
       className={cn(
         "flex w-full items-center gap-2.5 rounded-lg border px-3.5 py-2.5 text-left text-sm transition-colors duration-150 ease-out motion-reduce:transition-none",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+        FILTER_FOCUS_CLASS,
         selected
           ? "border-primary bg-primary font-semibold text-white"
-          : "border-border bg-white font-medium text-primary hover:border-primary/40 hover:bg-surface",
+          : "border-border bg-white font-medium text-primary [@media(hover:hover)_and_(pointer:fine)]:hover:border-primary/40 [@media(hover:hover)_and_(pointer:fine)]:hover:bg-surface",
       )}
     >
       {Icon && <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />}

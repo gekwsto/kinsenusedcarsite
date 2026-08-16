@@ -3,7 +3,7 @@
 import * as React from "react";
 import {
   ListChecks,
-  Sparkles,
+  Package,
   BadgeCheck,
   PackageOpen,
   ChevronLeft,
@@ -105,17 +105,19 @@ export function SpecsExtrasSelector({ activeTab, className }: { activeTab: Specs
     //
     // `relative` turns this into the glider's offset parent (see the
     // `offsetLeft`/`offsetWidth` measurement above) and its positioning
-    // context. The outer surface's own background/border tint shifts by a
-    // hair depending on which option is active — felt more than seen.
+    // context. The outer surface's own background/border is now a fixed
+    // neutral value — no longer conditional on which option is active —
+    // matching the Leasing/Αγορά track exactly, and removing the
+    // independent (and previously imperfectly-synced) track transition
+    // that contributed to the reported glider seam.
     <TabsList
       ref={listRef}
       className={cn(
-        "relative grid w-full grid-cols-2 transition-colors duration-300 ease-out motion-reduce:transition-none lg:inline-flex lg:w-auto",
-        activeTab === "specs" ? "border-[#dfe8ed] bg-[#f7fafc]" : "border-[#cfe6ea] bg-[#f2f9fa]",
+        "relative grid w-full grid-cols-2 border-[#dfe8ed] bg-[#f7fafc] lg:inline-flex lg:w-auto",
         className,
       )}
     >
-      <SegmentedGlider rect={glider} tone={activeTab === "specs" ? "a" : "b"} sweepKey={activeTab} />
+      <SegmentedGlider rect={glider} tone={activeTab === "specs" ? "a" : "b"} />
 
       <TabsTrigger
         ref={specsRef}
@@ -136,7 +138,11 @@ export function SpecsExtrasSelector({ activeTab, className }: { activeTab: Specs
         value="extras"
         className="relative z-10 px-3 duration-200 data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=inactive]:hover:bg-white/50 sm:px-4"
       >
-        <Sparkles
+        {/* `Package` — reads as "equipment/accessories bundle" more clearly
+            than the previous `Sparkles` glyph, which leaned decorative
+            rather than semantic. Same size/stroke treatment as the
+            Χαρακτηριστικά icon beside it. */}
+        <Package
           className={cn(
             "hidden h-4 w-4 shrink-0 transition-transform duration-200 ease-out motion-reduce:transition-none sm:block",
             activeTab === "extras" && "scale-105",
@@ -155,8 +161,11 @@ export function SpecsGrid({ specs }: { specs: VehicleSpecItem[] }) {
       {specs.map(({ key, label, value }) => {
         const Icon = SPEC_ICONS[key];
         return (
-          <div key={key} className="flex items-center gap-3.5 border-b border-[#edf2f5] px-1 py-4 last:border-b-0">
-            <span className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full border border-[#dfe8ed] bg-white text-detail">
+          <div key={key} className="group flex items-center gap-3.5 border-b border-[#edf2f5] px-1 py-4 last:border-b-0">
+            {/* Deep-navy icon glyph on a white circle with a clearly
+                visible deep-navy border (no fill/glow), with just a hair
+                more emphasis on hover. */}
+            <span className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full border-2 border-primary/70 bg-white text-primary transition-colors duration-200 ease-out group-hover:border-primary motion-reduce:transition-none">
               <Icon className="h-4 w-4" />
             </span>
             <div>
@@ -184,7 +193,13 @@ export function ExtrasPanel({ extras }: { extras: VehicleExtraItem[] }) {
   if (extras.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-[#dfe8ed] bg-[#fafcfd] px-6 py-10 text-center">
-        <span className="flex h-12 w-12 items-center justify-center rounded-full border border-[#dfe8ed] bg-white text-[#8a97a5]">
+        {/* Same premium icon treatment as the vehicle-spec circles:
+            deep-navy glyph, white surface, clearly visible same-family
+            deep-navy border — kept as `PackageOpen` (an empty/open box)
+            rather than the active tab's `Package`, a deliberate
+            distinction that still reads as "no equipment" semantically
+            while matching the same visual system. */}
+        <span className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-primary/70 bg-white text-primary">
           <PackageOpen className="h-5 w-5" />
         </span>
         <p className="font-bold text-detail-title">Δεν έχει δηλωθεί έξτρα εξοπλισμός για το συγκεκριμένο όχημα.</p>
@@ -200,7 +215,7 @@ export function ExtrasPanel({ extras }: { extras: VehicleExtraItem[] }) {
             key={extra.id}
             className="flex items-center gap-3 rounded-lg border border-[#dfe8ed] bg-white px-4 py-3 min-w-0"
           >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-detail/25 bg-detail/5 text-detail">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-primary/70 bg-primary/5 text-primary">
               <BadgeCheck className="h-4 w-4" />
             </span>
             <span className="min-w-0 break-words text-sm font-bold text-detail-title">{extra.displayName}</span>
@@ -254,7 +269,7 @@ function PaginationButton({
       onClick={onClick}
       className={cn(
         "flex h-8 w-8 items-center justify-center rounded-md border border-[#dfe8ed] bg-white text-detail-title transition-colors duration-150 ease-out motion-reduce:transition-none",
-        "hover:border-detail/40 hover:bg-detail/5",
+        "hover:border-primary/40 hover:bg-primary/5",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
         "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[#dfe8ed] disabled:hover:bg-white",
       )}

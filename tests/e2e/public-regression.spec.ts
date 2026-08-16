@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { attachRuntimeErrorGuard, assertNoRuntimeErrors, bannerLocators, waitForAccordionSettled } from "./helpers";
+import { attachRuntimeErrorGuard, assertNoRuntimeErrors, bannerLocators, waitForAccordionSettled, waitForBackgroundRequestsSettled } from "./helpers";
 
 // Root-provider (CookieConsentProvider/FavoritesProvider) regression —
 // these public-site behaviors were not directly edited by the consent
@@ -29,9 +29,13 @@ test.describe("navigation regression", () => {
     // as an uncaught page error — a test-harness-visible artifact of an
     // abandoned page transition, not a defect a real visitor would ever
     // notice (the navigation itself completes correctly either way).
-    // Letting this page's own load settle before navigating away removes
-    // the race instead of asserting around its output.
-    await page.waitForLoadState("networkidle");
+    // Letting this page's own trailing background requests settle before
+    // navigating away removes the race instead of asserting around its
+    // output. Plain networkidle can't be used here: PublicRealtimeProvider
+    // holds its SSE connection open for the page's entire lifetime, so
+    // "zero in-flight requests" would never occur — this variant excludes
+    // that one intentionally-permanent connection from the count.
+    await waitForBackgroundRequestsSettled(page);
 
     await page.goto("/privacy-policy");
     await expect(bannerLocators(page).region).toBeHidden();
@@ -45,7 +49,7 @@ test.describe("navigation regression", () => {
     // which no fixed string/pattern can reliably distinguish from a real
     // uncaught error. Waiting here removes the race instead of guessing at
     // its output.
-    await page.waitForLoadState("networkidle");
+    await waitForBackgroundRequestsSettled(page);
 
     await page.goBack();
     await page.waitForURL("**/vehicles");

@@ -2,14 +2,23 @@
 
 import * as React from "react";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { X, Scale } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { NavigationLink as Link } from "@/components/navigation/navigation-link";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { KINSEN_CTA_BUTTON_CLASSNAME } from "@/components/ui/kinsen-cta-button";
 import { useVehicleComparison } from "@/components/providers/vehicle-comparison-provider";
 import { useCookieConsent } from "@/components/providers/cookie-consent-provider";
-import { formatEuro, formatKm, FALLBACK_VEHICLE_IMAGE } from "@/lib/utils";
+import { cn, formatEuro, formatKm, FALLBACK_VEHICLE_IMAGE } from "@/lib/utils";
+import {
+  calculateCompareFooterState,
+  calculateFooterDocumentTop,
+  calculateCompareFooterMaxExtraLift,
+  calculateCompareFooterGap,
+  type CompareFooterState,
+} from "@/lib/compare-footer-state";
 import type { VehicleComparisonSummary } from "@/lib/vehicle-comparison";
 
 const DESKTOP_MEDIA_QUERY = "(min-width: 1024px)";
@@ -91,14 +100,28 @@ function ComparisonSlot({ index, vehicle, onRemove }: { index: number; vehicle: 
   );
 }
 
-function PanelBody({ titleId }: { titleId: string }) {
+function PanelBody({ titleId, onClose }: { titleId: string; onClose?: () => void }) {
   const { selectedVehicles, selectedCount, maxVehicles, minVehicles, removeVehicle, clearVehicles, canCompare, comparisonUrl } = useVehicleComparison();
   const slots = Array.from({ length: maxVehicles }, (_, index) => selectedVehicles[index]);
 
   return (
     <>
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
+      {/* `flex-wrap` (not a fixed breakpoint-specific stacked layout) is
+          the safety net for the narrowest phones: if "Εκκαθάριση όλων"
+          doesn't fit beside the title on one line, it wraps to its own
+          line below instead of colliding with anything — correct at any
+          width without hardcoding when that happens, and unaffected by
+          future label/font-size changes. On desktop (`onClose` passed),
+          the close button is a genuine flex sibling of "Εκκαθάριση
+          όλων" in the same reserved action cluster — not an absolutely
+          positioned overlay — so the two can never occupy the same space.
+          On mobile, the Sheet's own built-in close button is a separate,
+          fixed `right-4 top-4` element outside this component's control
+          (shared across every Sheet consumer in the app, intentionally
+          untouched here); `pr-8` reserves enough clearance for its actual
+          footprint so this row's own content never reaches under it. */}
+      <div className={cn("mb-4 flex flex-wrap items-start justify-between gap-x-3 gap-y-2", !onClose && "pr-8")}>
+        <div className="min-w-0">
           <h2 id={titleId} className="text-lg font-bold text-primary">
             Σύγκριση οχημάτων
           </h2>
@@ -106,15 +129,27 @@ function PanelBody({ titleId }: { titleId: string }) {
             {selectedCount}/{maxVehicles} επιλεγμένα
           </p>
         </div>
-        {selectedCount > 0 && (
-          <button
-            type="button"
-            onClick={clearVehicles}
-            className="shrink-0 text-sm font-semibold text-ink-muted underline-offset-2 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-          >
-            Εκκαθάριση όλων
-          </button>
-        )}
+        <div className="flex shrink-0 items-center gap-1">
+          {selectedCount > 0 && (
+            <button
+              type="button"
+              onClick={clearVehicles}
+              className="rounded-md px-2 py-1.5 text-sm font-semibold text-ink-muted underline-offset-2 hover:bg-surface hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+            >
+              Εκκαθάριση όλων
+            </button>
+          )}
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Κλείσιμο σύγκρισης"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-ink-muted hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-col gap-2.5">
@@ -125,12 +160,24 @@ function PanelBody({ titleId }: { titleId: string }) {
 
       <div className="mt-5 border-t border-border pt-4">
         <p className="mb-3 text-sm text-ink-muted">{progressCopy(selectedCount, minVehicles, maxVehicles)}</p>
+        {/* Same static Kinsen corporate CTA as "Σύνδεση" (see
+            kinsen-cta-button.tsx) — full-width, this panel's own
+            comfortable height. `disabled:opacity-50
+            disabled:pointer-events-none` (already on the shared Button
+            base) keeps the disabled branch below from reading as
+            interactive. */}
         {canCompare && comparisonUrl ? (
-          <Button asChild variant="primary" className="w-full">
+          <Button asChild variant="primary" className={cn(KINSEN_CTA_BUTTON_CLASSNAME, "h-14 w-full rounded-md text-base")}>
             <Link href={comparisonUrl}>Δείτε τη σύγκριση</Link>
           </Button>
         ) : (
-          <Button type="button" variant="primary" className="w-full" disabled aria-disabled="true">
+          <Button
+            type="button"
+            variant="primary"
+            disabled
+            aria-disabled="true"
+            className={cn(KINSEN_CTA_BUTTON_CLASSNAME, "h-14 w-full rounded-md text-base")}
+          >
             Δείτε τη σύγκριση
           </Button>
         )}
@@ -178,24 +225,264 @@ function useCookieBannerClearance(bannerVisible: boolean): number {
   return clearance;
 }
 
+// The extra downward "settle" nudge (px) composed on top of the current
+// visual lift only while fully hidden — see useFooterAwareCompareState
+// below for how the two combine into one transform.
+const COMPARE_HIDE_SETTLE_PX = 8;
+
+// Drives the floating launcher's relationship with the real global
+// Footer using a baseline/extra model (see calculateCompareFooterState,
+// src/lib/compare-footer-state.ts, for the full rationale): the lift the
+// page's natural, unscrolled geometry already requires (`baselineLift` —
+// on a short page viewed on a tall viewport this can legitimately be
+// large, and must never by itself hide the launcher) is computed
+// separately from the *additional* lift caused by the user actually
+// scrolling further (`extraLift` — small, bounded, the only quantity
+// that can ever push the launcher into "hidden"). This hook is only the
+// observer/measurement/DOM plumbing around that pure function.
+//
+// `baselineLift` is derived from the Footer's *document-space* top edge
+// (calculateFooterDocumentTop: `rect.top + window.scrollY`) rather than
+// by physically scrolling the page to measure it — that value is
+// mathematically invariant to the current scroll position (the `+
+// scrollY` term exactly cancels the `-scrollY` baked into
+// `getBoundingClientRect()` by the browser), so recomputing it on every
+// measurement tick is both correct (always reflects the page's real,
+// current layout — Footer content changes, viewport resizes, different
+// page after a route change) and *stable* while the user merely scrolls
+// (it only changes when the underlying layout genuinely changes, per
+// section 15/16 of the brief — no separate caching/staleness logic is
+// needed for that guarantee, it falls out of the math itself).
+//
+// Performance: one IntersectionObserver against the Footer gates an
+// `isNear` flag sized to the (now small, bounded) `maxExtraLift` budget
+// — not the old, potentially-huge total lift — since a short page's
+// large baseline already makes the Footer genuinely visible/intersecting
+// from the start, the *default* (near-viewport-sized) IntersectionObserver
+// already reports "near" correctly for that case with no special-casing.
+// While outside that zone, nothing else runs; inside it, a passive,
+// rAF-throttled scroll listener re-runs the precise pure-function math.
+// `state` (normal/avoiding/hidden) is React state (changes rarely,
+// drives aria/class attributes); `visualLift` is written directly to the
+// DOM node's own `transform` via ref on every relevant tick — never a
+// React re-render per scroll pixel.
+//
+// `visualLift`'s own CSS transition is asymmetric: while continuously
+// tracking the Footer within the *same* state, an *increasing* lift
+// (Footer getting closer) snaps instantly rather than animating — the
+// Footer itself has no transition of its own, so a fast/large scroll can
+// move it well past this control's still-animating position within one
+// transition window otherwise. A *decreasing* lift and any actual state
+// boundary crossing (normal↔avoiding↔hidden) get the full smooth
+// transition. The very first measurement inside each effect run (mount,
+// or after a route change / geometry-affecting prop change) is always
+// applied instantly regardless — establishing a large baseline should
+// read as "that's just where it starts", never as a dramatic travel
+// animation (section 20/21 of the brief); `useLayoutEffect` (not
+// `useEffect`) ensures that first correction lands before the browser's
+// first paint of this component, so there is no flash of the wrong
+// (unlifted) position either. This hook only ever mounts client-side
+// (VehicleComparisonTray gates on `isHydrated` first), so there is no
+// SSR warning risk from using the layout-effect form here.
+function useFooterAwareCompareState(button: HTMLButtonElement | null, clearance: number, routeKey: string): CompareFooterState {
+  const [state, setState] = React.useState<CompareFooterState>("normal");
+  // Persists across effect *recreation* (route changes, clearance changes)
+  // — unlike an effect-local variable, which would reset to "normal" on
+  // every new run regardless of what React's own `state` actually still
+  // is. Without this, a route change landing on "normal" geometry right
+  // after a prior route left `state` as "hidden" would compute
+  // `result.state !== <freshly-reset-local "normal">` as `false` and
+  // never call `setState`, leaving the launcher stuck hidden.
+  const currentStateRef = React.useRef<CompareFooterState>("normal");
+
+  React.useLayoutEffect(() => {
+    const footer = document.querySelector<HTMLElement>("[data-site-footer]");
+    const publicMain = document.querySelector<HTMLElement>("[data-public-main]");
+    if (!button || !footer) return;
+
+    let currentVisualLift = 0;
+    let rafId: number | null = null;
+    let isNear = false;
+    let isFirstMeasurement = true;
+    let intersectionObserver: IntersectionObserver | null = null;
+
+    const applyVisual = (visualLift: number, nextState: CompareFooterState, smooth: boolean) => {
+      const settle = nextState === "hidden" ? COMPARE_HIDE_SETTLE_PX : 0;
+      const total = visualLift - settle; // net upward distance; the hide settle nudges it back down slightly while fading
+      button.style.transitionDuration = smooth ? "" : "0ms";
+      button.style.transform = total !== 0 ? `translateY(${-total}px)` : "";
+      currentVisualLift = visualLift;
+    };
+
+    const measure = () => {
+      rafId = null;
+      const viewportHeight = window.innerHeight;
+      const safeGap = calculateCompareFooterGap(window.innerWidth);
+      const maxExtraLift = calculateCompareFooterMaxExtraLift(viewportHeight);
+      const launcherBottom = viewportHeight - parseFloat(getComputedStyle(button).bottom);
+      const footerRect = footer.getBoundingClientRect();
+      const footerDocumentTop = calculateFooterDocumentTop(footerRect.top, window.scrollY);
+
+      const result = calculateCompareFooterState({
+        baselineLift: launcherBottom + safeGap - footerDocumentTop,
+        currentRequiredLift: launcherBottom + safeGap - footerRect.top,
+        maxExtraLift,
+      });
+
+      const stateChanged = result.state !== currentStateRef.current;
+      // Continuous same-state tracking only snaps on an *increase*; any
+      // actual state change or the very first measurement of this effect
+      // run always gets a stable (non-animated) application.
+      const smooth = !isFirstMeasurement && (stateChanged || result.visualLift <= currentVisualLift);
+      if (stateChanged) {
+        currentStateRef.current = result.state;
+        setState(result.state);
+      }
+      applyVisual(result.visualLift, result.state, smooth);
+      isFirstMeasurement = false;
+    };
+
+    const scheduleMeasure = () => {
+      if (!isNear || rafId !== null) return;
+      rafId = requestAnimationFrame(measure);
+    };
+
+    measure(); // synchronous initial read, before paint (useLayoutEffect) — correct from the very first frame even on a short page with a large baseline.
+
+    const handleScrollOrResize = () => scheduleMeasure();
+    window.addEventListener("scroll", handleScrollOrResize, { passive: true });
+
+    const resizeObserver = new ResizeObserver(() => scheduleMeasure());
+    resizeObserver.observe(footer);
+    resizeObserver.observe(button);
+
+    // The Footer's own size rarely changes, but its *document position*
+    // does whenever the public content above it (vehicle list, marketing
+    // content) changes height — e.g. a realtime `router.refresh()`, or a
+    // route change landing on content whose real size differs from
+    // whatever was momentarily still in the DOM at this effect's very
+    // first synchronous measurement — with no pathname change, viewport
+    // resize, or Footer/button size change of its own. A *separate*
+    // observer (rather than folding it into the one above) deliberately
+    // bypasses the `isNear` proximity gate: that gate exists purely to
+    // skip the continuous scroll-tracking work when nothing is currently
+    // relevant, but a genuine content-height change must always be
+    // reflected immediately, even while the Footer is currently far from
+    // the viewport — otherwise a wrong measurement taken while far away
+    // would stay silently stale until the user happened to scroll close
+    // enough to reopen the gate on its own.
+    let mainResizeObserver: ResizeObserver | null = null;
+    if (publicMain) {
+      mainResizeObserver = new ResizeObserver(() => {
+        if (rafId !== null) return;
+        rafId = requestAnimationFrame(measure);
+      });
+      mainResizeObserver.observe(publicMain);
+    }
+
+    const createIntersectionObserver = () => {
+      intersectionObserver?.disconnect();
+      // A modest pre-filter zone sized to the bounded extra-lift budget
+      // (plus headroom) — not the (now unbounded) baseline, which the
+      // synchronous initial `measure()` above already establishes
+      // correctly regardless of this observer's own state. Recreated on
+      // resize since `maxExtraLift` is viewport-height-derived.
+      const zone = calculateCompareFooterMaxExtraLift(window.innerHeight) + 64;
+      intersectionObserver = new IntersectionObserver(
+        ([entry]) => {
+          isNear = entry?.isIntersecting ?? false;
+          if (isNear) scheduleMeasure();
+        },
+        { rootMargin: `0px 0px ${zone}px 0px`, threshold: 0 },
+      );
+      intersectionObserver.observe(footer);
+    };
+    createIntersectionObserver();
+
+    const handleResize = () => {
+      createIntersectionObserver();
+      scheduleMeasure();
+    };
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      window.removeEventListener("scroll", handleScrollOrResize);
+      window.removeEventListener("resize", handleResize);
+      resizeObserver.disconnect();
+      mainResizeObserver?.disconnect();
+      intersectionObserver?.disconnect();
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
+    // `routeKey` (the current pathname) is a deliberate dependency, not
+    // used inside the effect body — the public layout persists across
+    // client-side route changes, so the Footer's own DOM node is not
+    // remounted and its *size* may not change between routes even though
+    // its *position* does (different page content above it) — a
+    // ResizeObserver on the Footer alone cannot see a pure position
+    // shift. Recreating this effect (and its synchronous initial
+    // `measure()`) on every route change is what re-establishes the
+    // correct baseline for whatever page is now actually rendered.
+  }, [button, clearance, routeKey]);
+
+  return state;
+}
+
 function CollapsedControl() {
   const { selectedCount, isSidebarOpen, openSidebar, maxVehicles } = useVehicleComparison();
   const { bannerVisible } = useCookieConsent();
   const clearance = useCookieBannerClearance(bannerVisible);
+  const pathname = usePathname();
+  const [buttonNode, setButtonNode] = React.useState<HTMLButtonElement | null>(null);
+  const footerState = useFooterAwareCompareState(buttonNode, clearance, pathname);
+  const hidden = footerState === "hidden";
+
+  // Focus-edge-case safety (section 17 of the brief): if the launcher
+  // happened to be the actively focused element at the exact moment it
+  // transitions to `aria-hidden`, browsers do not automatically move
+  // focus away from a now-hidden-from-the-a11y-tree element — blur it
+  // explicitly so keyboard focus never sits invisibly. Never fires during
+  // ordinary "avoiding" movement, only the avoiding→hidden edge.
+  React.useEffect(() => {
+    if (hidden && buttonNode && document.activeElement === buttonNode) {
+      buttonNode.blur();
+    }
+  }, [hidden, buttonNode]);
 
   if (isSidebarOpen || selectedCount === 0) return null;
 
   return (
-    <button
+    // A persistent right-anchored utility, not a centered CTA — `fixed`
+    // lives directly on the Button, anchored as close to the real
+    // viewport edge as is visually safe (`right-*` below), respecting
+    // `env(safe-area-inset-right)` on notched/rounded-corner devices —
+    // never `left-1/2 -translate-x-1/2` centering. The dynamic
+    // cookie-banner clearance (see useCookieBannerClearance above) is
+    // this same element's own inline `bottom` — its one normal-state
+    // position; useFooterAwareCompareState above composes a bounded
+    // upward `transform` on top of it (never touching `bottom` itself)
+    // while avoiding, and fades it out only once even that bound isn't
+    // enough. `pointer-events-none` + `tabIndex={-1}` + `aria-hidden`
+    // while hidden keep it from being clickable or invisibly focusable;
+    // all three are cleared the instant the Footer clears the hidden
+    // threshold, restoring normal interaction.
+    <Button
+      ref={setButtonNode}
       type="button"
+      variant="primary"
       onClick={(event) => openSidebar(event.currentTarget)}
       aria-label={`Άνοιγμα σύγκρισης οχημάτων, ${selectedCount} από ${maxVehicles} επιλεγμένα`}
+      aria-hidden={hidden || undefined}
+      tabIndex={hidden ? -1 : undefined}
       style={{ bottom: `calc(env(safe-area-inset-bottom) + ${clearance}px)` }}
-      className="fixed z-[45] inline-flex items-center gap-2 rounded-full border border-border bg-primary px-4 py-3 text-sm font-semibold text-white shadow-card transition-[bottom] duration-200 hover:bg-primary-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent motion-reduce:transition-none left-1/2 -translate-x-1/2 lg:left-auto lg:right-6 lg:translate-x-0"
+      className={cn(
+        KINSEN_CTA_BUTTON_CLASSNAME,
+        "fixed z-[45] right-[calc(env(safe-area-inset-right)+6px)] gap-2 rounded-md px-4 text-sm shadow-card transition-[opacity,transform] duration-[240ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none sm:h-14 sm:gap-2.5 sm:px-5 sm:text-[15px] md:text-base lg:right-[calc(env(safe-area-inset-right)+8px)] lg:px-6 2xl:h-[58px] 2xl:text-[17px] h-12",
+        hidden ? "pointer-events-none opacity-0" : "opacity-100",
+      )}
     >
-      <Scale className="h-4 w-4" />
+      <Scale className="h-4 w-4 lg:h-5 lg:w-5" />
       Σύγκριση οχημάτων · {selectedCount}/{maxVehicles}
-    </button>
+    </Button>
   );
 }
 
@@ -203,7 +490,6 @@ function DesktopPanel() {
   const { isSidebarOpen, closeSidebar, lastTriggerRef } = useVehicleComparison();
   const shouldReduceMotion = useReducedMotion();
   const panelRef = React.useRef<HTMLDivElement>(null);
-  const closeButtonRef = React.useRef<HTMLButtonElement>(null);
   const titleId = React.useId();
   const wasOpenRef = React.useRef(false);
 
@@ -242,16 +528,7 @@ function DesktopPanel() {
           transition={{ duration: shouldReduceMotion ? 0.01 : 0.28, ease: [0.22, 1, 0.36, 1] }}
           className="fixed inset-y-0 right-0 z-[45] hidden w-full max-w-[420px] flex-col overflow-y-auto border-l border-border bg-white p-6 shadow-card lg:flex"
         >
-          <button
-            ref={closeButtonRef}
-            type="button"
-            onClick={closeSidebar}
-            aria-label="Κλείσιμο σύγκρισης"
-            className="absolute right-4 top-4 rounded-md p-1.5 text-ink-muted hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-          >
-            <X className="h-4 w-4" />
-          </button>
-          <PanelBody titleId={titleId} />
+          <PanelBody titleId={titleId} onClose={closeSidebar} />
         </motion.aside>
       )}
     </AnimatePresence>

@@ -6,9 +6,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { signIn, getSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useNavigationTransition } from "@/components/providers/navigation-transition-provider";
-import { Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react";
+import { Eye, EyeOff, Loader2, LogIn, Lock, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { KINSEN_GLOW_SURFACE_CLASSNAME, KinsenGlowOverlay } from "@/components/ui/kinsen-glow-button";
+import { KINSEN_CTA_BUTTON_CLASSNAME } from "@/components/ui/kinsen-cta-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -71,23 +71,30 @@ export function LoginForm() {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
       {registered && (
-        <p className="rounded-lg bg-accent/10 px-3 py-2 text-sm text-accent-dark">
+        <p className="rounded-xl border border-accent/15 bg-accent/5 px-3.5 py-2.5 text-sm text-accent-dark">
           Ο λογαριασμός σας δημιουργήθηκε επιτυχώς. Συνδεθείτε για να συνεχίσετε.
         </p>
       )}
 
       <div className="space-y-1.5">
         <Label htmlFor="login-email">Email</Label>
-        <div className="relative">
+        {/* `group` + `group-focus-within` lets the icon pick up a quiet
+            color shift on focus without any extra JS state — a small,
+            refined touch in place of the old input's heavy focus ring. */}
+        <div className="group relative">
           <Mail
             aria-hidden="true"
-            className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted"
+            className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted/70 transition-colors group-focus-within:text-primary"
           />
           <Input
             id="login-email"
             type="email"
             autoComplete="email"
-            className="pl-10 focus-visible:ring-accent/40"
+            placeholder="name@example.com"
+            // Soft-outline treatment: a thin, muted border and no default
+            // box-shadow ring — focus reads as a quiet border-color shift
+            // plus a very low-opacity ring, not a loud colored glow.
+            className="h-12 rounded-xl border-border/70 bg-white pl-10 text-[15px] shadow-none transition-colors focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary/15"
             {...register("email")}
           />
         </div>
@@ -96,23 +103,24 @@ export function LoginForm() {
 
       <div className="space-y-1.5">
         <Label htmlFor="login-password">Κωδικός</Label>
-        <div className="relative">
+        <div className="group relative">
           <Lock
             aria-hidden="true"
-            className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted"
+            className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted/70 transition-colors group-focus-within:text-primary"
           />
           <Input
             id="login-password"
             type={showPassword ? "text" : "password"}
             autoComplete="current-password"
-            className="pl-10 pr-10 focus-visible:ring-accent/40"
+            placeholder="Εισαγάγετε τον κωδικό σας"
+            className="h-12 rounded-xl border-border/70 bg-white pl-10 pr-10 text-[15px] shadow-none transition-colors focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary/15"
             {...register("password")}
           />
           <button
             type="button"
             onClick={() => setShowPassword((prev) => !prev)}
             aria-label={showPassword ? "Απόκρυψη κωδικού" : "Εμφάνιση κωδικού"}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink"
+            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-ink-muted/70 transition-colors hover:text-primary"
           >
             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
@@ -120,7 +128,7 @@ export function LoginForm() {
         {errors.password && <p className="text-xs text-red-600">{errors.password.message}</p>}
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between pt-1">
         <div className="flex items-center gap-2">
           <Checkbox id="login-remember" />
           <Label htmlFor="login-remember" className="text-sm font-normal text-ink-muted">
@@ -129,30 +137,34 @@ export function LoginForm() {
         </div>
         <span
           aria-disabled="true"
-          className="text-sm text-ink-muted cursor-not-allowed select-none"
+          className="cursor-not-allowed select-none text-sm text-ink-muted/70"
         >
           Ξεχάσατε τον κωδικό;
         </span>
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && (
+        <p className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-600">{error}</p>
+      )}
 
-      {/* Same Kinsen navy → expanding-teal-circle hover system as the navbar
-          "Σύνδεση" action (see kinsen-glow-button.tsx) — just this form's
-          own existing full-width sizing. `disabled:pointer-events-none`
-          (already on the shared Button base) means the hover/active glow
-          simply never engages while `submitting`, with no extra state
-          needed here for that. */}
+      {/* Same static Kinsen corporate CTA as the navbar "Σύνδεση" action
+          (see kinsen-cta-button.tsx) — just this form's own existing
+          full-width sizing, with a taller height/softer radius to match
+          the new input treatment. `disabled:opacity-50
+          disabled:pointer-events-none` (already on the shared Button
+          base) keeps this from reading as interactive while `submitting`. */}
       <Button
         type="submit"
-        className={cn(KINSEN_GLOW_SURFACE_CLASSNAME, "w-full rounded-md")}
+        variant="primary"
+        className={cn(KINSEN_CTA_BUTTON_CLASSNAME, "h-12 w-full rounded-xl")}
         disabled={submitting}
       >
-        <KinsenGlowOverlay />
-        <span className="relative z-10 inline-flex items-center gap-2">
-          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          Σύνδεση
-        </span>
+        {submitting ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <LogIn className="h-4 w-4" aria-hidden="true" />
+        )}
+        Σύνδεση
       </Button>
     </form>
   );

@@ -24,7 +24,15 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
         <VehicleComparisonProvider>
           <div className="flex min-h-screen flex-col">
             <Header />
-            <main className="flex-1">{children}</main>
+            {/* Non-visual observation target for the floating comparison
+                launcher's Footer-aware geometry (see vehicle-comparison-tray.tsx's
+                useFooterAwareCompareState) — its ResizeObserver watches this
+                element's rendered size so a same-route content-height change
+                (e.g. a realtime-driven vehicle list update) that shifts the
+                Footer's document position, without changing the Footer's own
+                size or the route, still triggers a remeasurement. Carries no
+                styling of its own. */}
+            <main data-public-main="" className="flex-1">{children}</main>
             <Footer />
           </div>
           <CookieBanner />

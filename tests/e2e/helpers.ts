@@ -1,4 +1,4 @@
-import { type BrowserContext, type Locator, type Page, expect } from "@playwright/test";
+import { type BrowserContext, type Locator, type Page, type Request, expect } from "@playwright/test";
 
 // ---------- Admin auth ----------
 
@@ -7,15 +7,34 @@ import { type BrowserContext, type Locator, type Page, expect } from "@playwrigh
 export const SEEDED_ADMIN_EMAIL = "admin@kinsen.local";
 export const SEEDED_ADMIN_PASSWORD = "change-me-after-login";
 
-/** Logs in through the real /login form (not a cookie/session shortcut) and waits for the post-login admin redirect. */
+/**
+ * Logs in through the real /login form (not a cookie/session shortcut) and
+ * waits for actual authenticated readiness — not global network idle, which
+ * never resolves on this app now that PublicRealtimeProvider holds an SSE
+ * connection open at /api/realtime/events for the lifetime of the page.
+ */
 export async function loginAsAdmin(page: Page) {
-  await page.goto("/login", { waitUntil: "networkidle" });
-  await page.locator("#login-email").fill(SEEDED_ADMIN_EMAIL);
+  await page.goto("/login", { waitUntil: "load" });
+  const emailField = page.locator("#login-email");
+  // Occasionally catches the page mid a transient double-render (a form
+  // briefly present twice before settling to one) — unrelated to
+  // networkidle/SSE, and pre-existing; waiting for the count to settle
+  // keeps this the same strict single-field expectation, just given room
+  // to resolve deterministically.
+  await expect(emailField).toHaveCount(1);
+  await expect(emailField).toBeVisible();
+  await emailField.fill(SEEDED_ADMIN_EMAIL);
   await page.locator("#login-password").fill(SEEDED_ADMIN_PASSWORD);
   await Promise.all([
     page.waitForURL(/\/admin/, { timeout: 15000 }),
     page.locator('button[type="submit"]').click(),
   ]);
+  // The URL changing is necessary but not sufficient — the admin shell
+  // (src/app/admin/layout.tsx's AdminTopbar) renders identically on every
+  // /admin/* route and depends on the real server session, so its logout
+  // button actually appearing is the stable signal the authenticated
+  // layout is ready to interact with.
+  await expect(page.getByRole("banner").getByRole("button", { name: "Αποσύνδεση" })).toBeVisible({ timeout: 10000 });
 }
 
 export const CONSENT_COOKIE_NAME = "kinsen_cookie_consent_v2";
@@ -244,11 +263,25 @@ function isBenignPrefetchAbort(url: string, errorText: string | undefined): bool
   return !!errorText && BENIGN_PREFETCH_ABORT_ERRORS.has(errorText) && url.includes("_rsc=");
 }
 
+// PublicRealtimeProvider opens an EventSource against this endpoint that's
+// meant to live for as long as the page does — so every time a test
+// navigates away (page.goto, a real link click, page.close()), the browser
+// necessarily aborts that still-open connection. That's the same class of
+// "cancelled, not broken" outcome already carved out for prefetches above,
+// just triggered by navigation instead of scrolling — a real EventSource
+// failure (the server actually refusing/erroring the connection) surfaces
+// as a genuine non-200 `response` event instead, which this guard still
+// catches via the `response`/status >= 500 listener below.
+function isBenignRealtimeAbort(url: string, errorText: string | undefined): boolean {
+  return !!errorText && BENIGN_PREFETCH_ABORT_ERRORS.has(errorText) && url.includes(SSE_REALTIME_PATH);
+}
+
 export function attachFailedRequestGuard(page: Page, baseURL: string): string[] {
   const failures: string[] = [];
   page.on("requestfailed", (req) => {
-    if (req.url().startsWith(baseURL) && !isBenignPrefetchAbort(req.url(), req.failure()?.errorText)) {
-      failures.push(`${req.url()} — ${req.failure()?.errorText ?? "unknown error"}`);
+    const errorText = req.failure()?.errorText;
+    if (req.url().startsWith(baseURL) && !isBenignPrefetchAbort(req.url(), errorText) && !isBenignRealtimeAbort(req.url(), errorText)) {
+      failures.push(`${req.url()} — ${errorText ?? "unknown error"}`);
     }
   });
   page.on("response", (res) => {
@@ -261,4 +294,60 @@ export function attachFailedRequestGuard(page: Page, baseURL: string): string[] 
 
 export function assertNoFailedFirstPartyRequests(failures: string[]) {
   expect(failures, `Unexpected failed/5xx first-party requests:\n${failures.join("\n")}`).toEqual([]);
+}
+
+// ---------- SSE-aware "network settled" helper ----------
+
+// PublicRealtimeProvider (src/components/providers/public-realtime-provider.tsx)
+// holds one intentional, permanent connection open at all times against
+// /api/realtime/events, so Playwright's built-in `networkidle` wait — which
+// requires ZERO in-flight requests — never resolves on this app's public
+// pages anymore. That built-in wait was never really about "the network is
+// silent" as an end in itself: call sites used it to let a page's own
+// trailing background requests (JS chunks, prefetches, images) finish
+// before doing something disruptive — navigating away mid-fetch (which
+// surfaces as a spurious cancelled-request pageerror) or asserting "no
+// failed request" before a late one has even been attempted. This
+// reimplements that same narrow intent while excluding the realtime
+// connection from the count, instead of waiting on it to end.
+const SSE_REALTIME_PATH = "/api/realtime/events";
+
+export async function waitForBackgroundRequestsSettled(page: Page, options: { timeout?: number; quietWindow?: number } = {}): Promise<void> {
+  const { timeout = 5000, quietWindow = 400 } = options;
+  let inFlight = 0;
+
+  await new Promise<void>((resolve, reject) => {
+    let settleTimer: ReturnType<typeof setTimeout> | null = null;
+    const overallTimer = setTimeout(() => {
+      cleanup();
+      reject(new Error(`waitForBackgroundRequestsSettled: timed out after ${timeout}ms with ${inFlight} non-realtime request(s) still in flight`));
+    }, timeout);
+
+    function cleanup() {
+      clearTimeout(overallTimer);
+      if (settleTimer) clearTimeout(settleTimer);
+      page.off("request", onRequest);
+      page.off("requestfinished", onSettled);
+      page.off("requestfailed", onSettled);
+    }
+    function scheduleSettleCheck() {
+      if (settleTimer) clearTimeout(settleTimer);
+      if (inFlight === 0) settleTimer = setTimeout(() => { cleanup(); resolve(); }, quietWindow);
+    }
+    function onRequest(req: Request) {
+      if (req.url().includes(SSE_REALTIME_PATH)) return;
+      inFlight++;
+      if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; }
+    }
+    function onSettled(req: Request) {
+      if (req.url().includes(SSE_REALTIME_PATH)) return;
+      inFlight = Math.max(0, inFlight - 1);
+      scheduleSettleCheck();
+    }
+
+    page.on("request", onRequest);
+    page.on("requestfinished", onSettled);
+    page.on("requestfailed", onSettled);
+    scheduleSettleCheck(); // in case it's already quiet
+  });
 }

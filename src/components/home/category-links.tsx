@@ -19,7 +19,7 @@ export function CategoryLinks() {
           <Link
             key={label}
             href={href}
-            className={`group relative z-0 flex w-[140px] flex-col items-center gap-3 rounded-2xl py-2 outline-none hover:z-20 focus-visible:z-20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface sm:w-[170px]`}
+            className={`group relative z-0 flex w-[140px] flex-col items-center gap-3 rounded-2xl py-2 outline-none hover:z-20 focus-visible:z-20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-surface sm:w-[170px]`}
           >
             <div className="relative flex h-[140px] w-[140px] items-center justify-center overflow-visible sm:h-[160px] sm:w-[160px]">
               <div
@@ -35,7 +35,7 @@ export function CategoryLinks() {
               </div>
             </div>
             <p
-              className={`text-sm font-medium text-primary transition-[color,transform] ${TRANSITION} group-hover:-translate-y-1 group-hover:text-accent group-focus-visible:-translate-y-1 group-focus-visible:text-accent sm:text-base`}
+              className={`text-sm font-medium text-primary transition-[color,transform] ${TRANSITION} group-hover:-translate-y-1 group-hover:text-primary-dark group-focus-visible:-translate-y-1 group-focus-visible:text-primary-dark sm:text-base`}
             >
               {label}
             </p>

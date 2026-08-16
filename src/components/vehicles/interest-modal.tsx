@@ -7,8 +7,9 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { usePathname } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, CheckCircle2, X } from "lucide-react";
+import { Loader2, CheckCircle2, X, User, Mail, Phone, MessageSquare, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { KINSEN_CTA_BUTTON_CLASSNAME } from "@/components/ui/kinsen-cta-button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -20,12 +21,19 @@ import { createLeadSchema, type CreateLeadInput } from "@/lib/validators/lead.sc
 type InterestType = CreateLeadInput["interestType"];
 
 const INTEREST_LABELS: Record<InterestType, string> = {
-  LEASING: "Ενδιαφέρον για Leasing",
+  LEASING: "Ενδιαφέρομαι για Leasing",
   FINANCING: "Ενδιαφέρον για Δανειοδότηση",
   TEST_DRIVE: "Κράτηση Test Drive",
   GENERAL: "Ερώτηση για το όχημα",
   PURCHASE: "Ενδιαφέρον για Αγορά",
 };
+
+// Same soft-outline premium field treatment as the redesigned Login/Contact
+// forms (thin muted border, soft radius, a quiet border-color-only focus
+// state instead of a loud colored ring) — kept as one constant so all five
+// fields below stay visually identical without repeating the class string.
+const MODAL_FIELD_CLASSNAME =
+  "h-12 rounded-xl border-border/70 bg-white pl-10 text-[15px] shadow-none transition-colors focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary/15";
 
 // Matches the Kinsen premium easing used elsewhere (navigation loader, hero
 // heading) so all motion across the site reads as one consistent system.
@@ -137,9 +145,9 @@ export function InterestModalProvider({
                     exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 6, scale: 0.99 }}
                     transition={{ duration: shouldReduceMotion ? 0.01 : 0.24, ease: PANEL_EASE }}
                     style={{ willChange: "transform, opacity" }}
-                    className="kinsen-modal-scroll relative max-h-[min(88dvh,760px)] w-full max-w-[min(92vw,640px)] overflow-y-auto overscroll-contain rounded-card border border-border bg-white p-6 shadow-[0_24px_70px_-30px_rgba(1,38,56,0.42)]"
+                    className="kinsen-modal-scroll relative max-h-[min(88dvh,760px)] w-full max-w-[min(92vw,640px)] overflow-y-auto overscroll-contain rounded-2xl border border-border/60 bg-white p-6 shadow-[0_20px_60px_-24px_rgba(2,56,89,0.35)] sm:p-7"
                   >
-                    <DialogPrimitive.Close className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-md text-ink-muted hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50">
+                    <DialogPrimitive.Close className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-md text-ink-muted transition-colors duration-150 ease-out hover:bg-surface hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 motion-reduce:transition-none">
                       <X className="h-4 w-4" />
                       <span className="sr-only">Κλείσιμο</span>
                     </DialogPrimitive.Close>
@@ -254,8 +262,12 @@ function InterestModalPanel({
           {INTEREST_LABELS[interestType]}
         </DialogPrimitive.Title>
         <DialogPrimitive.Description className="text-sm text-ink-muted">
-          {vehicleLabel ? `Για το όχημα: ${vehicleLabel}. ` : ""}Συμπληρώστε τα στοιχεία σας και θα επικοινωνήσουμε
-          μαζί σας το συντομότερο.
+          {vehicleLabel && (
+            <>
+              Για το όχημα: <span className="font-semibold text-primary">{vehicleLabel}</span>.{" "}
+            </>
+          )}
+          Συμπληρώστε τα στοιχεία σας και θα επικοινωνήσουμε μαζί σας το συντομότερο.
         </DialogPrimitive.Description>
       </div>
 
@@ -279,12 +291,24 @@ function InterestModalPanel({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="im-firstName">Όνομα</Label>
-              <Input id="im-firstName" {...register("firstName")} />
+              <div className="group relative">
+                <User
+                  aria-hidden="true"
+                  className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted/70 transition-colors group-focus-within:text-primary"
+                />
+                <Input id="im-firstName" placeholder="Το όνομά σας" className={MODAL_FIELD_CLASSNAME} {...register("firstName")} />
+              </div>
               {errors.firstName && <p className="text-xs text-red-600">{errors.firstName.message}</p>}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="im-lastName">Επώνυμο</Label>
-              <Input id="im-lastName" {...register("lastName")} />
+              <div className="group relative">
+                <User
+                  aria-hidden="true"
+                  className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted/70 transition-colors group-focus-within:text-primary"
+                />
+                <Input id="im-lastName" placeholder="Το επώνυμό σας" className={MODAL_FIELD_CLASSNAME} {...register("lastName")} />
+              </div>
               {errors.lastName && <p className="text-xs text-red-600">{errors.lastName.message}</p>}
             </div>
           </div>
@@ -292,18 +316,42 @@ function InterestModalPanel({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="im-email">Email</Label>
-              <Input id="im-email" type="email" {...register("email")} />
+              <div className="group relative">
+                <Mail
+                  aria-hidden="true"
+                  className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted/70 transition-colors group-focus-within:text-primary"
+                />
+                <Input id="im-email" type="email" placeholder="name@example.com" className={MODAL_FIELD_CLASSNAME} {...register("email")} />
+              </div>
               {errors.email && <p className="text-xs text-red-600">{errors.email.message}</p>}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="im-phone">Τηλέφωνο (προαιρετικό)</Label>
-              <Input id="im-phone" type="tel" {...register("phone")} />
+              <div className="group relative">
+                <Phone
+                  aria-hidden="true"
+                  className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted/70 transition-colors group-focus-within:text-primary"
+                />
+                <Input id="im-phone" type="tel" placeholder="69XXXXXXXX" className={MODAL_FIELD_CLASSNAME} {...register("phone")} />
+              </div>
             </div>
           </div>
 
           <div className="space-y-1.5">
             <Label htmlFor="im-message">Μήνυμα (προαιρετικό)</Label>
-            <Textarea id="im-message" rows={3} className="min-h-[84px]" {...register("message")} />
+            <div className="group relative">
+              <MessageSquare
+                aria-hidden="true"
+                className="pointer-events-none absolute left-3.5 top-3.5 h-4 w-4 text-ink-muted/70 transition-colors group-focus-within:text-primary"
+              />
+              <Textarea
+                id="im-message"
+                rows={3}
+                placeholder="Γράψτε μας κάτι που θα θέλατε να γνωρίζουμε..."
+                className={cn(MODAL_FIELD_CLASSNAME, "min-h-[84px] py-3")}
+                {...register("message")}
+              />
+            </div>
           </div>
 
           <div className="flex items-start gap-2.5">
@@ -322,10 +370,25 @@ function InterestModalPanel({
           </div>
           {errors.consent && <p className="text-xs text-red-600">{errors.consent.message}</p>}
 
-          {status === "error" && errorMessage ? <p className="text-sm text-red-600">{errorMessage}</p> : null}
+          {status === "error" && errorMessage ? (
+            <p className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-600">{errorMessage}</p>
+          ) : null}
 
-          <Button type="submit" variant="accent" className="w-full" disabled={status === "submitting"}>
-            {status === "submitting" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          {/* Same shared premium CTA as the Login/Contact submit buttons
+              (Button variant="primary" + KINSEN_CTA_BUTTON_CLASSNAME, see
+              kinsen-cta-button.tsx) — replaces the previous one-off
+              `variant="accent"` cyan fill. */}
+          <Button
+            type="submit"
+            variant="primary"
+            className={cn(KINSEN_CTA_BUTTON_CLASSNAME, "h-12 w-full rounded-xl")}
+            disabled={status === "submitting"}
+          >
+            {status === "submitting" ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" aria-hidden="true" />
+            )}
             Αποστολή αιτήματος
           </Button>
         </form>

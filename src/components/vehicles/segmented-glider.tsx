@@ -6,22 +6,26 @@ import { cn } from "@/lib/utils";
 /**
  * The shared visual system behind every vehicle-detail two-option segmented
  * control (Χαρακτηριστικά/Έξτρα εξοπλισμός, Leasing/Αγορά): one continuous
- * teal glider that physically slides + morphs color between two options,
- * rather than each option independently toggling its own background. Both
- * consumers keep fully independent state/behavior — this only centralizes
- * the shared measurement math and glider markup so the two controls can
- * never visually drift apart.
+ * deep-navy glider that physically slides between two options, rather than
+ * each option independently toggling its own background. Both consumers
+ * keep fully independent state/behavior — this only centralizes the shared
+ * measurement math and glider markup so the two controls can never visually
+ * drift apart.
  *
- * "a" (brighter teal) is always the first/left option's tone, "b" (deeper,
- * richer teal) the second/right option's — matching the finalized
- * Χαρακτηριστικά/Έξτρα εξοπλισμός treatment exactly, reused verbatim rather
- * than re-derived, so both controls read as one design system.
+ * Both tones are the same approved Kinsen navy family used by the primary
+ * CTA system (`primary`/`primary-dark`, see kinsen-cta-button.tsx) rather
+ * than a one-off hex — "a" (the first/left option) is `primary`, "b" (the
+ * second/right option) one shade darker, `primary-dark`, so the two options
+ * still read as subtly distinct without reaching for a different hue
+ * (previously a teal pair, `#0f96a7`/`#00707d` — removed). The shadow is
+ * the same restrained `shadow-soft` token used across the rest of the site
+ * instead of a bespoke tinted glow.
  */
 export type GliderTone = "a" | "b";
 
 const TONE_CLASSNAME: Record<GliderTone, string> = {
-  a: "bg-[#0f96a7] shadow-[0_6px_16px_rgba(0,137,154,0.30),inset_0_1px_0_rgba(255,255,255,0.35)]",
-  b: "bg-[#00707d] shadow-[0_6px_16px_rgba(0,112,125,0.32),inset_0_1px_0_rgba(255,255,255,0.30)]",
+  a: "bg-primary shadow-soft",
+  b: "bg-primary-dark shadow-soft",
 };
 
 export interface GliderRect {
@@ -63,13 +67,19 @@ export function useGliderRect(
 /**
  * The glider itself: an absolutely-positioned overlay animating only
  * `transform`/`width` (position) plus `background-color`/`box-shadow`
- * (tone) — never `left`, so it never triggers a page-level reflow — with a
- * one-shot light-sweep highlight remounted via `sweepKey` on every switch.
- * Render this as the first child of a `position: relative` track, before
- * the two option buttons/triggers (which must sit on `relative z-10` so
- * they paint above it).
+ * (tone) — never `left`, so it never triggers a page-level reflow. Render
+ * this as the first child of a `position: relative` track, before the two
+ * option buttons/triggers (which must sit on `relative z-10` so they paint
+ * above it).
+ *
+ * Previously carried a one-shot diagonal light-sweep highlight on top of
+ * the tone fill (remounted per switch via a `sweepKey` prop) — removed:
+ * against a solid navy fill it read as a stray white streak/seam crossing
+ * the pill mid-transition rather than a polished highlight, so the glider
+ * is now just the plain animated tone fill with nothing layered on top of
+ * it. `rect`/`tone` are the only two things that ever change here.
  */
-export function SegmentedGlider({ rect, tone, sweepKey }: { rect: GliderRect | null; tone: GliderTone; sweepKey: string }) {
+export function SegmentedGlider({ rect, tone }: { rect: GliderRect | null; tone: GliderTone }) {
   return (
     <span
       aria-hidden="true"
@@ -79,10 +89,6 @@ export function SegmentedGlider({ rect, tone, sweepKey }: { rect: GliderRect | n
         rect ? "opacity-100" : "opacity-0",
       )}
       style={rect ? { transform: `translateX(${rect.left}px)`, width: `${rect.width}px` } : undefined}
-    >
-      <span key={sweepKey} className="absolute inset-0 overflow-hidden rounded-full">
-        <span className="absolute inset-y-0 left-0 w-1/3 animate-tab-glider-sweep bg-gradient-to-r from-transparent via-white/25 to-transparent motion-reduce:hidden" />
-      </span>
-    </span>
+    />
   );
 }

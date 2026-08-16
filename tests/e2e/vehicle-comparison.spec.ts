@@ -616,8 +616,12 @@ test.describe("vehicle comparison — /compare column alignment", () => {
       const ids = raw ? (JSON.parse(raw).ids as string[]) : [];
       return "/compare?vehicles=" + ids.join(",");
     }, STORAGE_KEY);
-    await page.goto(url);
-    await page.waitForLoadState("networkidle");
+    // /compare is a server component (src/app/(public)/compare/page.tsx)
+    // that resolves its data before rendering, so the table's own presence
+    // — not global network idle, which the app's permanent realtime SSE
+    // connection prevents from ever occurring — is the real readiness signal.
+    await page.goto(url, { waitUntil: "load" });
+    await expect(page.locator("table").first()).toBeVisible();
   }
 
   async function assertColumnsAndButtonsAligned(page: Page, vehicleCount: number) {

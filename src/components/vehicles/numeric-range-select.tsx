@@ -4,7 +4,7 @@ import * as React from "react";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { FILTER_RANGE_LABEL_CLASS } from "@/components/vehicles/filter-typography";
+import { FILTER_RANGE_LABEL_CLASS, FILTER_FOCUS_CLASS } from "@/components/vehicles/filter-typography";
 
 // Radix Select reserves value="" to mean "no selection" internally (an
 // item with an empty value throws), so the "no restriction" choice below
@@ -55,7 +55,7 @@ export function NumericRangeSelect({
         <Select value={minValue || UNSET_SENTINEL} onValueChange={(next) => onMinChange(next === UNSET_SENTINEL ? "" : next)}>
           <SelectTrigger
             aria-label={minAriaLabel}
-            className={cn("h-11 text-sm", minValue ? "font-medium text-primary" : "text-ink-muted")}
+            className={cn("h-11 text-sm", FILTER_FOCUS_CLASS, minValue ? "font-medium text-primary" : "text-ink-muted")}
           >
             <SelectValue placeholder={minPlaceholder} />
           </SelectTrigger>
@@ -77,7 +77,7 @@ export function NumericRangeSelect({
         <Select value={maxValue || UNSET_SENTINEL} onValueChange={(next) => onMaxChange(next === UNSET_SENTINEL ? "" : next)}>
           <SelectTrigger
             aria-label={maxAriaLabel}
-            className={cn("h-11 text-sm", maxValue ? "font-medium text-primary" : "text-ink-muted")}
+            className={cn("h-11 text-sm", FILTER_FOCUS_CLASS, maxValue ? "font-medium text-primary" : "text-ink-muted")}
           >
             <SelectValue placeholder={maxPlaceholder} />
           </SelectTrigger>

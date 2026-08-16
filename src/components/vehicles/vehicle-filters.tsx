@@ -30,7 +30,7 @@ import { NumericRangeSelect } from "@/components/vehicles/numeric-range-select";
 import { FilterToggleButton } from "@/components/vehicles/filter-toggle-button";
 import { resolveFuelIcon, resolveTransmissionIcon, resolveVehicleTypeIcon, DEALS_ICON } from "@/components/vehicles/filter-option-metadata";
 import { MakerBadge } from "@/components/vehicles/maker-badge";
-import { FILTER_TRIGGER_CLASS } from "@/components/vehicles/filter-typography";
+import { FILTER_TRIGGER_CLASS, FILTER_FOCUS_CLASS } from "@/components/vehicles/filter-typography";
 import { createNumericRange } from "@/lib/numeric-range";
 import { cn, formatKm } from "@/lib/utils";
 import { normalizeForSearch as normalizeColorTerm, colorMatchesSearch, colorGroupKey, compareColors } from "@/lib/color-search";
@@ -135,7 +135,20 @@ const SECTION_ICON_MAP: Record<VehicleFilterSection, LucideIcon> = {
 // Shared row chrome for every AccordionItem in the panel — rounded,
 // spaced rows with a soft tint while open, replacing the previous flat
 // full-bleed `border-b` divider list every section shared identically.
-const ITEM_CLASS = "rounded-xl border-b-0 transition-colors duration-150 hover:bg-surface/60 data-[state=open]:bg-filterHeading/[0.05]";
+//
+// `hover:` and `data-[state=open]:` both used to set this same element's
+// `background-color` unconditionally, so an *open* row being hovered had
+// two independent rules resolving the same property with no defined
+// winner between them — exactly the kind of open+hover competition that
+// read as the row "switching" tints instead of settling on one. Scoping
+// the hover rule to `data-[state=closed]` makes the two mutually
+// exclusive: open rows keep one constant tint no matter the pointer, and
+// only closed rows ever receive the hover tint. That hover tint is also
+// gated to `(hover: hover) and (pointer: fine)` so a tap on a touch
+// device can never leave it visually stuck on afterward.
+const ITEM_CLASS =
+  "rounded-xl border-b-0 transition-colors duration-150 data-[state=open]:bg-primary/5 " +
+  "[@media(hover:hover)_and_(pointer:fine)]:data-[state=closed]:hover:bg-surface/60";
 
 // Premium manufacturer tile — replaces the old compact checkbox row with a
 // large, centered logo (56px, well above the old 34px circle) so the brand
@@ -147,18 +160,27 @@ function MakerTile({ maker, checked, onToggle }: { maker: string; checked: boole
   return (
     <label
       className={cn(
-        "group relative flex cursor-pointer flex-col items-center gap-2 rounded-xl border px-2 py-3 text-center transition-all duration-150",
+        // Narrowed from `transition-all` to exactly the four properties
+        // this tile ever animates (background/border/shadow from the
+        // checked ternary below, transform from the hover lift) — never
+        // an accidental transition on layout/typography if either changes
+        // later.
+        "group relative flex cursor-pointer flex-col items-center gap-2 rounded-xl border px-2 py-3 text-center transition-[background-color,border-color,box-shadow,transform] duration-150",
         checked
           ? "border-primary bg-primary/[0.06] shadow-soft"
-          : "border-border/70 bg-white hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-soft",
+          : "border-border/70 bg-white [@media(hover:hover)_and_(pointer:fine)]:hover:-translate-y-0.5 [@media(hover:hover)_and_(pointer:fine)]:hover:border-primary/40 [@media(hover:hover)_and_(pointer:fine)]:hover:shadow-soft",
       )}
     >
       <Checkbox
         checked={checked}
         onCheckedChange={onToggle}
-        className="absolute right-1.5 top-1.5 h-4 w-4 bg-white/90"
+        className={cn("absolute right-1.5 top-1.5 h-4 w-4 bg-white/90", FILTER_FOCUS_CLASS)}
       />
-      <MakerBadge maker={maker} size={56} className="shadow-lg transition-transform duration-150 group-hover:scale-110" />
+      <MakerBadge
+        maker={maker}
+        size={56}
+        className="shadow-lg transition-transform duration-150 [@media(hover:hover)_and_(pointer:fine)]:group-hover:scale-110"
+      />
       <span className={cn("line-clamp-2 text-xs leading-tight", checked ? "font-bold text-primary" : "font-medium text-[#1a1a1a]")}>
         {maker}
       </span>
@@ -169,15 +191,22 @@ function MakerTile({ maker, checked, onToggle }: { maker: string; checked: boole
 // Icon chip + label + active-filter dot, shared by every accordion
 // trigger below. `group-data-[state=open]` reads the Radix Trigger's own
 // data-state (see ui/accordion.tsx's `group` class) — no separate
-// React-level "is this section open" bookkeeping needed just for this.
+// React-level "is this section open" bookkeeping needed just for this,
+// and no hover variant exists on this icon chip at all, so its color is
+// always driven by that one open/closed fact — never by transient
+// pointer position, so hovering an already-open row can never revert its
+// white icon back toward navy. `bg-surface` (not `bg-filterHeading/10`,
+// a teal-family token) is this repo's actual neutral/slate surface color
+// — the closed-state chip reads as a soft neutral container, not a cyan
+// one.
 function FilterSectionHeading({ icon: Icon, label, active }: { icon: LucideIcon; label: string; active: boolean }) {
   return (
     <span className="flex flex-1 items-center gap-3">
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-filterHeading/10 text-filterHeading transition-colors duration-150 group-data-[state=open]:bg-filterHeading group-data-[state=open]:text-white">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface text-primary transition-colors duration-150 group-data-[state=open]:bg-primary group-data-[state=open]:text-white">
         <Icon className="h-4 w-4" aria-hidden="true" />
       </span>
       <span className="flex-1">{label}</span>
-      {active && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-filterHeading" aria-hidden="true" />}
+      {active && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-hidden="true" />}
     </span>
   );
 }
@@ -356,7 +385,7 @@ export function VehicleFilters({ options }: { options: VehicleFilterOptions }) {
   const filterHeader = (
     <div className="border-b border-border pb-3">
       <div className="flex items-center gap-2.5">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-filterHeading/10 text-filterHeading">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-filterHeading/10 text-primary">
           <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
         </span>
         <h2 className="text-2xl font-bold leading-tight text-primary">Φίλτρα</h2>
@@ -414,7 +443,7 @@ export function VehicleFilters({ options }: { options: VehicleFilterOptions }) {
                   placeholder="Αναζήτηση κατασκευαστή"
                   value={makerSearch}
                   onChange={(e) => setMakerSearch(e.target.value)}
-                  className="pl-8"
+                  className={cn("pl-8", FILTER_FOCUS_CLASS)}
                 />
               </div>
 
@@ -596,7 +625,7 @@ export function VehicleFilters({ options }: { options: VehicleFilterOptions }) {
                   placeholder="Αναζήτηση χρώματος"
                   value={colorSearch}
                   onChange={(e) => setColorSearch(e.target.value)}
-                  className="pl-8"
+                  className={cn("pl-8", FILTER_FOCUS_CLASS)}
                 />
               </div>
 
@@ -622,6 +651,7 @@ export function VehicleFilters({ options }: { options: VehicleFilterOptions }) {
                             <Checkbox
                               checked={selectedColors.includes(color)}
                               onCheckedChange={() => setCsvParam("color", color)}
+                              className={FILTER_FOCUS_CLASS}
                             />
                             <span>{color}</span>
                           </label>
@@ -707,11 +737,7 @@ export function VehicleFilters({ options }: { options: VehicleFilterOptions }) {
       </div>
 
       <aside className="hidden shrink-0 lg:sticky lg:top-[var(--kinsen-header-offset)] lg:block lg:self-start">
-        <div className="relative flex max-h-[calc(100dvh_-_var(--kinsen-header-offset)_-_2rem)] flex-col overflow-hidden rounded-card border border-border bg-white shadow-soft">
-          {/* Same "soft ambient accent" top hairline already used on the
-              footer (footer.tsx) — reuses that established motif instead
-              of inventing a new one for this panel. */}
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-transparent via-accent/70 to-transparent" />
+        <div className="relative flex max-h-[calc(100dvh_-_var(--kinsen-header-offset)_-_2rem)] flex-col overflow-hidden rounded-card border border-primary/20 bg-white shadow-soft">
           <div className="shrink-0 px-4 pt-4">{filterHeader}</div>
           <div className="vehicle-filters-scroll min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-3">
             {filterCategories}
@@ -740,13 +766,13 @@ function ActiveFiltersBox({
   if (chips.length === 0) return null;
 
   return (
-    <div className="kinsen-active-filters-box mt-2.5 rounded-lg border border-filterHeading/15 bg-filterHeading/[0.05] px-3 py-2.5">
+    <div className="kinsen-active-filters-box mt-2.5 rounded-lg border border-primary/15 bg-primary/[0.05] px-3 py-2.5">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="text-xs font-semibold text-filterHeading">Ενεργά φίλτρα: {chips.length}</span>
+        <span className="text-xs font-semibold text-primary">Ενεργά φίλτρα: {chips.length}</span>
         <button
           type="button"
           onClick={onClearAll}
-          className="flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-xs font-semibold text-filterHeading hover:bg-filterHeading/10"
+          className="flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-xs font-semibold text-primary hover:bg-primary/10"
         >
           <Trash2 className="h-3.5 w-3.5" /> Καθαρισμός όλων
         </button>
@@ -755,14 +781,14 @@ function ActiveFiltersBox({
         {chips.map((chip) => (
           <span
             key={chip.id}
-            className="inline-flex items-center gap-1 rounded-full border border-filterHeading/20 bg-white py-1 pl-2.5 pr-1 text-xs text-ink shadow-sm"
+            className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-white py-1 pl-2.5 pr-1 text-xs text-ink shadow-sm"
           >
             {chip.label}
             <button
               type="button"
               onClick={() => onRemoveChip(chip)}
               aria-label={chip.ariaLabel}
-              className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-ink-muted hover:bg-filterHeading/10 hover:text-filterHeading"
+              className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-ink-muted hover:bg-primary/10 hover:text-primary"
             >
               <X className="h-3 w-3" />
             </button>

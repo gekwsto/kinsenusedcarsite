@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.SITE_URL ?? "http://localhost:3000"),
   title: {
     default: "Kinsen Used Cars | Μεταχειρισμένα Οχήματα & Leasing",
-    template: "%s | Kinsen",
+    template: "Kinsen | %s",
   },
   description: "Μεταχειρισμένα αυτοκίνητα με leasing από την Kinsen Hellas.",
 };

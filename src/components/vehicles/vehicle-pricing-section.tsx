@@ -5,6 +5,8 @@ import { CalendarDays, Gauge, ShieldCheck, CheckCircle2, ArrowRight } from "luci
 import { FavoriteButton } from "@/components/vehicles/favorite-button";
 import { VehicleCompareToggle } from "@/components/vehicles/vehicle-compare-toggle";
 import { InterestModalTrigger } from "@/components/vehicles/interest-modal";
+import { Button } from "@/components/ui/button";
+import { KINSEN_CTA_BUTTON_CLASSNAME } from "@/components/ui/kinsen-cta-button";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import {
   SpecsExtrasSelector,
@@ -19,9 +21,6 @@ import type { VehicleComparisonSummary } from "@/lib/vehicle-comparison";
 
 type PricingTab = "LEASING" | "PURCHASE";
 type InfoTab = "specs" | "extras";
-
-const CTA_CLASSNAME =
-  "flex w-full items-center justify-center gap-2 rounded-lg border border-detail bg-detail px-3.5 py-3.5 text-sm font-extrabold text-white transition-colors hover:bg-[#004c74]";
 
 interface VehiclePricingSectionProps {
   vehicleId: string;
@@ -114,17 +113,18 @@ export function VehiclePricingSection({
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_1.25fr] lg:gap-10">
       {/* Left: tabs, title, meta */}
       <div>
+        {/* Track background/border is a fixed neutral surface, not
+            conditional on which option is active — a track that recolors
+            in lockstep with the glider is exactly the kind of two-element
+            transition sync that produced the reported seam artifact; a
+            static track removes that failure mode entirely rather than
+            trying to keep two independent transitions perfectly aligned. */}
         <div
           ref={pricingTrackRef}
-          className={cn(
-            "relative mb-4 grid w-full max-w-[320px] grid-cols-2 rounded-full border p-1 transition-colors duration-300 ease-out motion-reduce:transition-none",
-            !bothPricingOptionsAvailable || activeTab === "LEASING"
-              ? "border-[#dfe8ed] bg-[#f7fafc]"
-              : "border-[#cfe6ea] bg-[#f2f9fa]",
-          )}
+          className="relative mb-4 grid w-full max-w-[320px] grid-cols-2 rounded-full border border-[#dfe8ed] bg-[#f7fafc] p-1"
         >
           {bothPricingOptionsAvailable && (
-            <SegmentedGlider rect={pricingGlider} tone={activeTab === "LEASING" ? "a" : "b"} sweepKey={activeTab} />
+            <SegmentedGlider rect={pricingGlider} tone={activeTab === "LEASING" ? "a" : "b"} />
           )}
           {hasLeasing && (
             <button
@@ -138,7 +138,7 @@ export function VehiclePricingSection({
                   ? showLeasing
                     ? "text-white"
                     : "text-[#8a97a5] hover:bg-white/50 hover:text-detail-title"
-                  : "bg-detail text-white shadow-[0_8px_18px_rgba(0,137,154,0.22)]",
+                  : "bg-primary text-white shadow-soft",
               )}
             >
               Leasing
@@ -156,7 +156,7 @@ export function VehiclePricingSection({
                   ? activeTab === "PURCHASE"
                     ? "text-white"
                     : "text-[#8a97a5] hover:bg-white/50 hover:text-detail-title"
-                  : "bg-detail text-white shadow-[0_8px_18px_rgba(0,137,154,0.22)]",
+                  : "bg-primary text-white shadow-soft",
               )}
             >
               Αγορά
@@ -174,15 +174,15 @@ export function VehiclePricingSection({
 
         <div className="flex flex-wrap items-center gap-3 text-sm font-bold text-[#7b8794]">
           <span className="inline-flex items-center gap-1.5">
-            <CalendarDays className="h-4 w-4 text-detail" /> {yearRelease ?? "-"}
+            <CalendarDays className="h-4 w-4 text-primary" /> {yearRelease ?? "-"}
           </span>
           <span>·</span>
           <span className="inline-flex items-center gap-1.5">
-            <Gauge className="h-4 w-4 text-detail" /> {km !== null ? formatKm(km) : "-"}
+            <Gauge className="h-4 w-4 text-primary" /> {km !== null ? formatKm(km) : "-"}
           </span>
           <span>·</span>
           <span className="inline-flex items-center gap-1.5">
-            <ShieldCheck className="h-4 w-4 text-detail" /> Ελεγμένο
+            <ShieldCheck className="h-4 w-4 text-primary" /> Ελεγμένο
           </span>
         </div>
       </div>
@@ -192,7 +192,7 @@ export function VehiclePricingSection({
         <div className="grid grid-cols-1 gap-3.5">
           {showLeasing && (
             <div className="min-h-[116px] rounded-xl border border-[#dfe8ed] bg-white p-5">
-              <span className="mb-2 block font-extrabold text-detail">Leasing από</span>
+              <span className="mb-2 block font-extrabold text-primary">Leasing από</span>
               <div className="text-2xl font-black leading-none text-detail-title">
                 {formatEuro(monthlyPrice)}
                 <small className="text-sm font-extrabold text-[#52616f]"> /μήνα*</small>
@@ -202,7 +202,7 @@ export function VehiclePricingSection({
           )}
           {showPurchase && (
             <div className="min-h-[116px] rounded-xl border border-[#dfe8ed] bg-white p-5">
-              <span className="mb-2 block font-extrabold text-detail">Τιμή αγοράς</span>
+              <span className="mb-2 block font-extrabold text-primary">Τιμή αγοράς</span>
               <div className="text-2xl font-black leading-none text-detail-title">{formatEuro(price)}</div>
               <span className="mt-2 block font-bold text-[#52616f]">με ΦΠΑ</span>
             </div>
@@ -213,20 +213,20 @@ export function VehiclePricingSection({
           {showLeasing && (
             <>
               <span className="inline-flex items-center gap-1.5">
-                <CheckCircle2 className="h-4 w-4 text-detail" /> Χωρίς προκαταβολή
+                <CheckCircle2 className="h-4 w-4 text-primary" /> Χωρίς προκαταβολή
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <CheckCircle2 className="h-4 w-4 text-detail" /> Σταθερό μηνιαίο κόστος
+                <CheckCircle2 className="h-4 w-4 text-primary" /> Σταθερό μηνιαίο κόστος
               </span>
             </>
           )}
           {showPurchase && (
             <>
               <span className="inline-flex items-center gap-1.5">
-                <CheckCircle2 className="h-4 w-4 text-detail" /> Πλήρης κυριότητα οχήματος
+                <CheckCircle2 className="h-4 w-4 text-primary" /> Πλήρης κυριότητα οχήματος
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <CheckCircle2 className="h-4 w-4 text-detail" /> Χωρίς μηνιαίες δεσμεύσεις
+                <CheckCircle2 className="h-4 w-4 text-primary" /> Χωρίς μηνιαίες δεσμεύσεις
               </span>
             </>
           )}
@@ -261,8 +261,28 @@ export function VehiclePricingSection({
     <div className="mt-5 grid grid-cols-1 gap-3 border-b border-[#e8eef2] pb-6 lg:grid-cols-2 lg:items-center lg:gap-6">
       <SpecsExtrasSelector activeTab={infoTab} className="justify-self-start" />
       {ctaAvailable && (
-        <InterestModalTrigger interestType={activeTab} className={CTA_CLASSNAME}>
-          Ενδιαφέρομαι για {showLeasing ? "Leasing" : "Αγορά"} <ArrowRight className="h-4 w-4" />
+        // Same shared premium CTA system as the Login/Contact submit
+        // buttons (Button variant="primary" + KINSEN_CTA_BUTTON_CLASSNAME,
+        // see kinsen-cta-button.tsx) — `asChild` on the trigger composes its
+        // click-to-open-modal behavior onto the Button's own rendered
+        // element instead of duplicating a one-off filled button style.
+        //
+        // The trailing override below is a LOCAL, scoped color swap for
+        // this ONE CTA — applied unconditionally to both its Leasing and
+        // Αγορά states (same single button, only its label/interestType
+        // changes) — it does not touch KINSEN_CTA_BUTTON_CLASSNAME itself,
+        // so every other consumer of that shared class (Login, Contact,
+        // the comparison launcher, etc.) stays the standard navy.
+        <InterestModalTrigger interestType={activeTab} asChild>
+          <Button
+            variant="primary"
+            className={cn(
+              KINSEN_CTA_BUTTON_CLASSNAME,
+              "h-12 w-full rounded-xl border-accent-dark bg-accent hover:bg-accent",
+            )}
+          >
+            Ενδιαφέρομαι για {showLeasing ? "Leasing" : "Αγορά"} <ArrowRight className="h-4 w-4" />
+          </Button>
         </InterestModalTrigger>
       )}
     </div>

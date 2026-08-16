@@ -48,20 +48,36 @@ export async function Footer() {
   const scrambleRowLinks = [...SOCIAL_LINKS(settings), ...PARTNER_LINKS];
 
   return (
-    <footer className="relative overflow-hidden bg-gradient-to-b from-footer via-[#031f30] to-[#00121e] text-white">
-      {/* A soft ambient accent instead of a hard edge into the page above. */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/60 to-transparent" />
-      {/* Atmospheric glow behind the lower half of the footer — the same
-          teal already used everywhere on the site as the brand accent,
-          just given room to breathe here instead of a flat solid fill. */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[480px] bg-[radial-gradient(ellipse_60%_100%_at_50%_100%,rgba(57,192,195,0.16),transparent_70%)]" />
-
+    // The top edge is a shallow clip-path dip (24px deep at its center,
+    // flat again at both corners) replacing the previous hard straight
+    // edge — a percentage-x / pixel-y polygon sampling a sine curve, so
+    // it scales fluidly with the footer's width at every viewport
+    // without needing per-breakpoint tuning (same technique as the
+    // /login diagonal). The small pixel depth reveals a sliver of
+    // whatever page content sits directly above the footer in that gap —
+    // real footer content starts at `pt-14` (56px) below, well clear of
+    // the curve. No separate top border/accent is layered on top of it;
+    // the curve itself is the entire boundary treatment now.
+    <footer
+      // Non-visual observation target for the floating comparison
+      // launcher's footer-aware auto-hide (see vehicle-comparison-tray.tsx's
+      // useFooterVisible) — a stable, purpose-named selector rather than
+      // reaching for the bare `<footer>` tag (which could collide with a
+      // future nested `<footer>` elsewhere) or a CSS class (which could
+      // change with a restyle). Carries no styling of its own.
+      data-site-footer=""
+      className="relative overflow-hidden bg-gradient-to-b from-footer via-[#031f30] to-[#00121e] text-white"
+      style={{
+        clipPath:
+          "polygon(0% 0px, 5% 4px, 10% 7px, 15% 11px, 20% 14px, 25% 17px, 30% 19px, 35% 21px, 40% 23px, 45% 24px, 50% 24px, 55% 24px, 60% 23px, 65% 21px, 70% 19px, 75% 17px, 80% 14px, 85% 11px, 90% 7px, 95% 4px, 100% 0px, 100% 100%, 0% 100%)",
+      }}
+    >
       <div className="relative container-page pt-14 pb-10">
         <div className="grid grid-cols-1 gap-y-10 text-center sm:grid-cols-3 sm:text-left">
           <FooterColumn title="Πλοήγηση">
             {NAV_LINKS.map((link) => (
               <li key={link.href}>
-                <Link href={link.href} className="transition-colors hover:text-accent">
+                <Link href={link.href} className="transition-colors hover:text-white">
                   {link.label}
                 </Link>
               </li>
@@ -72,13 +88,13 @@ export async function Footer() {
             {COMPANY_LINKS.map((link) =>
               link.external ? (
                 <li key={link.href}>
-                  <a href={link.href} target="_blank" rel="noreferrer" className="transition-colors hover:text-accent">
+                  <a href={link.href} target="_blank" rel="noreferrer" className="transition-colors hover:text-white">
                     {link.label}
                   </a>
                 </li>
               ) : (
                 <li key={link.href}>
-                  <Link href={link.href} className="transition-colors hover:text-accent">
+                  <Link href={link.href} className="transition-colors hover:text-white">
                     {link.label}
                   </Link>
                 </li>
@@ -92,7 +108,7 @@ export async function Footer() {
                 href={mapsHref}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-2 transition-colors hover:text-accent"
+                className="inline-flex items-center gap-2 transition-colors hover:text-white"
               >
                 <MapPin className="size-4 shrink-0" aria-hidden="true" />
                 {settings.address}
@@ -101,7 +117,7 @@ export async function Footer() {
             <li>
               <a
                 href={`mailto:${settings.contactEmail}`}
-                className="inline-flex items-center gap-2 transition-colors hover:text-accent"
+                className="inline-flex items-center gap-2 transition-colors hover:text-white"
               >
                 <Mail className="size-4 shrink-0" aria-hidden="true" />
                 {settings.contactEmail}
@@ -110,7 +126,7 @@ export async function Footer() {
             <li>
               <a
                 href={`tel:${settings.contactPhone.replace(/\s+/g, "")}`}
-                className="inline-flex items-center gap-2 transition-colors hover:text-accent"
+                className="inline-flex items-center gap-2 transition-colors hover:text-white"
               >
                 <Phone className="size-4 shrink-0" aria-hidden="true" />
                 {settings.contactPhone}
@@ -136,7 +152,7 @@ export async function Footer() {
               ariaLabel={link.label}
               href={link.href}
               external
-              className="font-mono text-xs font-bold uppercase tracking-[0.08em] text-white/70 transition-colors hover:text-accent"
+              className="font-mono text-xs font-bold uppercase tracking-[0.08em] text-white/70 transition-colors hover:text-white"
             />
           ))}
         </div>
