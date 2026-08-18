@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import Script from "next/script";
 import { Providers } from "@/app/providers";
 import "./globals.css";
 
@@ -28,8 +29,26 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="el" className={manrope.variable} data-scroll-behavior="smooth">
+    <html
+      lang="el"
+      className={manrope.variable}
+      data-scroll-behavior="smooth"
+      suppressHydrationWarning
+    >
       <body className="font-sans antialiased">
+        {/* Sets data-platform on <html> before hydration so the CSS in
+            globals.css can scope the custom Windows scrollbar to Windows
+            only, leaving macOS on the browser's native scrollbar. Runs via
+            beforeInteractive so it executes ahead of first paint. */}
+        <Script id="platform-detect" strategy="beforeInteractive">
+          {`(function () {
+            var platform = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "";
+            var value = "other";
+            if (/win/i.test(platform)) value = "windows";
+            else if (/mac/i.test(platform)) value = "macos";
+            document.documentElement.dataset.platform = value;
+          })();`}
+        </Script>
         <Providers>{children}</Providers>
       </body>
     </html>
