@@ -22,16 +22,19 @@ export function Header() {
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-white/95 backdrop-blur">
       {/* `relative` is what makes the logo's absolute centering below measure
-          against this container's own box — which, since container-wide is
-          itself symmetric and only clamps to a max-width far past mobile/
-          tablet viewports, is equivalent to true viewport centering there.
-          Below `lg` the only two flex participants are the hamburger
-          wrapper and the right cluster (the logo is taken out of flow
-          entirely), so `justify-between` places them left/right with zero
-          risk of their differing widths pulling the centered logo off-axis
-          — the classic failure mode of trying to center a middle flex/grid
-          item between two asymmetric siblings. */}
-      <div className="container-wide relative flex h-16 items-center justify-between gap-3">
+          against this container's own box — which, since container-header is
+          itself symmetric and only clamps to a max-width below `lg` (well
+          past mobile/tablet viewports), is equivalent to true viewport
+          centering there. Below `lg` the only two flex participants are the
+          hamburger wrapper and the right cluster (the logo is taken out of
+          flow entirely), so `justify-between` places them left/right with
+          zero risk of their differing widths pulling the centered logo
+          off-axis — the classic failure mode of trying to center a middle
+          flex/grid item between two asymmetric siblings. From `lg` up, the
+          container drops its max-width entirely (see .container-header in
+          globals.css) so the logo and the nav/login cluster sit at the true
+          viewport edges instead of inside a centered box. */}
+      <div className="container-header relative flex h-16 items-center justify-between gap-3">
         {/* Hamburger trigger, left-aligned within the normal page gutter —
             hidden (and out of the flex layout entirely) at `lg`+, where
             MobileNav's own trigger button already carries `lg:hidden`. */}
@@ -42,13 +45,13 @@ export function Header() {
         <Link
           href="/"
           aria-label="Αρχική"
-          className="absolute left-1/2 top-1/2 h-8 w-24 shrink-0 -translate-x-1/2 -translate-y-1/2 sm:h-9 sm:w-28 md:h-10 md:w-32 lg:static lg:left-auto lg:top-auto lg:h-10 lg:w-32 lg:translate-x-0 lg:translate-y-0 xl:h-11 xl:w-36 2xl:h-12 2xl:w-40"
+          className="kinsen-header-logo absolute left-1/2 top-1/2 h-8 w-24 shrink-0 -translate-x-1/2 -translate-y-1/2 sm:h-9 sm:w-28 md:h-10 md:w-32 lg:static lg:left-auto lg:top-auto lg:translate-x-0 lg:translate-y-0"
         >
           <Image
             src="/images/brandlogo.png"
             alt="Kinsen Hellas"
             fill
-            sizes="(min-width: 1536px) 160px, (min-width: 1280px) 144px, (min-width: 768px) 128px, (min-width: 640px) 112px, 96px"
+            sizes="(min-width: 1024px) 190px, (min-width: 768px) 128px, (min-width: 640px) 112px, 96px"
             className="object-contain object-center lg:object-left"
             priority
           />
