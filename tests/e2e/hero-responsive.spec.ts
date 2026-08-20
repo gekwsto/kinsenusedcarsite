@@ -36,28 +36,36 @@ import { bannerLocators } from "./helpers";
 // 3. Exactly one heading and one image in the DOM at every viewport —
 //    the actual consolidation this file's history is about.
 //
-// 4. The Hero image is never responsively cropped, at ANY viewport, with
-//    NO exceptions — portrait phone, landscape phone, tablet (either
-//    orientation), desktop, or wide desktop. Three passes found and fixed
-//    violations of this: a first tablet-readability attempt shifted the
-//    crop window with `object-left` (still cropped the locked source
-//    photo, just aimed differently); the desktop/wide-desktop path used a
-//    `70vh`-driven box that cropped the image vertically (sky/floor) at
-//    every desktop width; and short landscape phones kept a similar
-//    `70vh`-driven exception on the reasoning that a full 16:9 box there
-//    would exceed the phone's own viewport height — rejected, since this
-//    is a normal scrollable document, not a presentation slide, and image
-//    integrity outranks fitting the Hero inside one screen. All three
-//    were the same underlying mismatch: an explicit `height`/`min-height`
-//    competing with (and, per the CSS spec, always winning over)
-//    `aspect-ratio`. The fix, now applied completely unconditionally, is
-//    what the portrait-phone tier always used: `aspect-[16/9]` with no
-//    competing height at all, so `object-cover` has nothing left to crop
-//    on any edge, at any width, ever. This suite protects that geometry
-//    (rendered aspect ratio must match the image's natural ratio,
-//    `object-position` must stay at the untouched browser default) across
-//    every representative viewport tier, including short landscape
-//    phones — there is no longer a tier this check excludes.
+// 4. TWO deliberate media-geometry modes, not a single universal rule:
+//
+//    PHONE/TABLET (below `1280px`): the Hero image is never responsively
+//    cropped, with no exceptions. A first tablet-readability attempt
+//    shifted the crop window with `object-left` (still cropped the
+//    locked source photo, just aimed differently) — rejected. `aspect-
+//    [16/9]` with no competing `height` means `object-cover` has nothing
+//    left to crop on any edge at these widths, so this suite protects
+//    that geometry (rendered aspect ratio must match the image's natural
+//    ratio, `object-position` must stay at the untouched browser
+//    default) across every phone/tablet tier, including short landscape
+//    phones.
+//
+//    LAPTOP/DESKTOP (`1280px`+, `.hero-media-box`'s own media-geometry
+//    rule): the Hero stays genuinely full-width — no side gutters, no
+//    width cap (an earlier pass tried exactly that: `width: min(100%,
+//    ...)` centered inside large left/right gutters — rejected, the
+//    Hero is meant to be a full-width visual statement) — but a real
+//    16:9 box at these widths would need to grow taller than useful
+//    (2560px wide -> 1440px tall), so `aspect-ratio` is released and a
+//    `height: clamp(...)` takes over instead. Because the section is now
+//    wider than 16:9, `object-cover` scales the photo to the section's
+//    own width and crops only vertically (sky above the cars, floor
+//    below) — a deliberate, accepted trade-off specific to this tier,
+//    verified to stay restrained enough that the full horizontal
+//    composition and every vehicle stay intact. This suite protects the
+//    desktop contract separately: full viewport width, no horizontal
+//    crop (checked via the actual `object-cover` geometry, not just the
+//    CSS declaration), height bounded by the clamp, all three vehicles'
+//    approximate vertical band still inside the visible window.
 
 const IMAGE_ASPECT_TOLERANCE = 0.02;
 
@@ -141,19 +149,20 @@ test.describe("homepage Hero — landscape-phone vs. short-desktop typography", 
     // `481px-639px` so it hands off cleanly to `sm:` at 640px.)
     expect(fontSize).toBeGreaterThan(50);
 
-    // The Hero box itself must still be governed by the source image's
-    // 16:9 aspect ratio here (not the compact landscape-phone override,
-    // which would make it far shorter than its own width implies) —
-    // `min-height` is no longer the mechanism that protects this (the
-    // desktop path carries no explicit height/min-height at all now, by
-    // design, so `aspect-ratio` can actually govern), so this checks the
-    // real invariant directly: rendered width÷height ≈ 16:9.
-    const heroImage = page.locator('img[alt="Kinsen hero image"]');
-    const { renderedAspect } = await heroImage.evaluate((el) => {
-      const rect = el.getBoundingClientRect();
-      return { renderedAspect: rect.width / rect.height };
-    });
-    expect(Math.abs(renderedAspect - 16 / 9)).toBeLessThanOrEqual(0.05);
+    // At this width the Hero is in desktop media-geometry mode (full
+    // width, controlled height via `.hero-media-box`'s clamp), NOT the
+    // compact landscape-phone `aspect-[16/9]` box — the two modes are
+    // told apart by width alone (`min-width:1280px`), never by height,
+    // which is exactly what this "short but wide" viewport exists to
+    // prove. Full width confirms the desktop mode actually engaged;
+    // the clamp's own 560px floor is what should govern the height at
+    // this unusually short 450px viewport.
+    const section = page.locator("section").first();
+    const box = await section.boundingBox();
+    expect(box).not.toBeNull();
+    expect(Math.round(box!.width)).toBe(1440);
+    expect(box!.height).toBeGreaterThanOrEqual(559);
+    expect(box!.height).toBeLessThanOrEqual(561);
   });
 });
 
@@ -203,7 +212,7 @@ test.describe("homepage Hero — portrait-phone image stays complete, text overl
   }
 });
 
-test.describe("homepage Hero — the full source image renders uncropped on every edge, at every viewport tier", () => {
+test.describe("homepage Hero — phone/tablet: the full source image renders uncropped on every edge (16:9, no exceptions)", () => {
   for (const [width, height, label] of [
     [375, 667, "portrait phone"],
     [430, 932, "portrait phone"],
@@ -216,13 +225,6 @@ test.describe("homepage Hero — the full source image renders uncropped on ever
     [1024, 768, "landscape tablet (iPad Mini)"],
     [1180, 820, "landscape tablet (iPad Air)"],
     [1194, 834, "landscape tablet"],
-    [1280, 800, "desktop"],
-    [1366, 768, "desktop"],
-    [1440, 900, "desktop"],
-    [1600, 900, "desktop"],
-    [1920, 1000, "wide desktop"],
-    [1920, 1080, "wide desktop"],
-    [2560, 1440, "wide desktop"],
   ] as const) {
     test(`${label} (${width}×${height}): image renders at the source's own 16:9 ratio — object-cover has nothing left to crop on any edge`, async ({
       page,
@@ -266,4 +268,159 @@ test.describe("homepage Hero — the full source image renders uncropped on ever
       await expect(heroImage).toHaveCount(1);
     });
   }
+});
+
+// `object-cover` scaling math, used to turn "the box is wider than 16:9"
+// into an actual, checkable crop percentage rather than trusting the CSS
+// declaration alone. When the container's aspect ratio exceeds the
+// source's, `object-cover` scales the image so its WIDTH matches the
+// container (i.e. `scaledHeight = containerWidth / naturalAspect`) and
+// crops only the vertical overflow — horizontal crop is mathematically
+// impossible in that regime, since the image's scaled width already
+// equals the container's own width exactly.
+function verticalCropPercent(containerWidth: number, containerHeight: number, naturalAspect: number) {
+  const scaledHeight = containerWidth / naturalAspect;
+  return 100 * (1 - containerHeight / scaledHeight);
+}
+
+test.describe("homepage Hero — laptop/desktop: full width, controlled height, vertical-only crop", () => {
+  for (const [width, height, label] of [
+    [1280, 800, "laptop"],
+    [1366, 768, "laptop"],
+    [1440, 900, "laptop"],
+    [1512, 982, "laptop"],
+    [1728, 1117, "laptop"],
+    [1920, 1000, "desktop"],
+    [1920, 1080, "desktop"],
+    [2048, 1152, "desktop"],
+    [2304, 1296, "large desktop"],
+    [2560, 1440, "target large-monitor class"],
+    [2880, 1620, "large desktop"],
+    [3440, 1440, "ultrawide"],
+  ] as const) {
+    test(`${label} (${width}×${height}): Hero spans the full viewport width with no side gutters, height stays within the clamp, crop is vertical-only and stays visually safe`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height });
+      await page.goto("/");
+      await dismissBanner(page);
+
+      const section = page.locator("section").first();
+      const box = await section.boundingBox();
+      expect(box).not.toBeNull();
+
+      // Full width, no side gutters — the earlier width-cap architecture
+      // (centered, with large left/right whitespace) is explicitly
+      // rejected; this is the regression guard for it.
+      expect(Math.round(box!.width)).toBe(width);
+      expect(box!.x).toBeLessThanOrEqual(1);
+
+      // Height stays inside `clamp(560px, max(72svh, 34vw), 1200px)` —
+      // never grows past the absolute ceiling no matter how wide the
+      // viewport gets, never collapses below the floor either. The `34vw`
+      // term (added specifically to curb ultrawide vertical crop — a flat
+      // `72svh`-only ceiling let crop climb to 57.6% at 3440px) means the
+      // realistic max in this test matrix is ~1170px at 3440px, well
+      // under the 1200px absolute ceiling.
+      expect(box!.height).toBeGreaterThanOrEqual(559);
+      expect(box!.height).toBeLessThanOrEqual(1201);
+
+      // Centered, unshifted vertical positioning — no horizontal focal
+      // trick, no zoom, just the plain `object-cover` default.
+      const heroImage = section.locator('img[alt="Kinsen hero image"]');
+      const objectPosition = await heroImage.evaluate((el) => getComputedStyle(el).objectPosition);
+      expect(objectPosition).toBe("50% 50%");
+
+      // The real proof of "no horizontal crop": compute the expected
+      // vertical-only crop from the actual rendered box + the image's own
+      // natural aspect ratio, and confirm the visible image width still
+      // equals the container's full width (never narrower — narrower
+      // would mean the image itself failed to cover the box's width,
+      // which `object-cover` never does, but this is the direct
+      // geometric check rather than trusting the CSS declaration alone).
+      const { naturalAspect, imgWidth, imgHeight } = await heroImage.evaluate((el) => {
+        const img = el as HTMLImageElement;
+        const rect = img.getBoundingClientRect();
+        return { naturalAspect: img.naturalWidth / img.naturalHeight, imgWidth: rect.width, imgHeight: rect.height };
+      });
+      expect(Math.round(imgWidth)).toBe(Math.round(box!.width));
+
+      const cropPct = verticalCropPercent(box!.width, box!.height, naturalAspect);
+      // A restrained, "sky/floor only" crop — comfortably below the
+      // point where the cars' own vertical band (measured against the
+      // source photo) would start being touched. The `34vw` term keeps
+      // this near a roughly constant ~28-40% across the whole large-
+      // desktop/ultrawide range in this matrix (confirmed via screenshot
+      // at 2560/2880/3440) instead of climbing indefinitely — a ceiling
+      // here well below the old formula's 57.6% high-water mark catches
+      // a regression back toward that flat-ceiling behavior.
+      expect(cropPct).toBeGreaterThanOrEqual(0);
+      expect(cropPct).toBeLessThan(45);
+      expect(Math.round(imgHeight)).toBe(Math.round(box!.height));
+
+      // The overlay text stays attached to the photo box itself, not
+      // separately positioned against the viewport.
+      const h1Box = await page.locator("h1").boundingBox();
+      expect(h1Box).not.toBeNull();
+      expect(h1Box!.x).toBeGreaterThanOrEqual(box!.x - 1);
+      expect(h1Box!.x + h1Box!.width).toBeLessThanOrEqual(box!.x + box!.width + 1);
+      expect(h1Box!.y).toBeGreaterThanOrEqual(box!.y - 1);
+      expect(h1Box!.y + h1Box!.height).toBeLessThanOrEqual(box!.y + box!.height + 1);
+
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(overflow).toBeLessThanOrEqual(0);
+
+      await expect(page.locator("h1")).toHaveCount(1);
+      await expect(heroImage).toHaveCount(1);
+    });
+  }
+
+  test("the 1280px transition is smooth — 1279 (16:9, phone/tablet mode) to 1281 (full-width, controlled-height mode) is not a visually absurd jump", async ({
+    page,
+  }) => {
+    const heights: Record<number, number> = { 1279: 800, 1280: 800, 1281: 800 };
+    const boxes: Record<number, { width: number; height: number }> = {};
+
+    for (const width of [1279, 1280, 1281]) {
+      await page.setViewportSize({ width, height: heights[width]! });
+      await page.goto("/");
+      await dismissBanner(page);
+      const box = await page.locator("section").first().boundingBox();
+      expect(box).not.toBeNull();
+      boxes[width] = { width: box!.width, height: box!.height };
+    }
+
+    // Below the gate: still the 16:9 box (height ≈ width * 9/16).
+    expect(Math.abs(boxes[1279]!.height - boxes[1279]!.width * (9 / 16))).toBeLessThanOrEqual(2);
+    // At/above the gate: controlled-height mode, height pinned near the
+    // clamp's floor at this viewport height (800 -> 72svh = 576px).
+    expect(Math.abs(boxes[1280]!.height - 576)).toBeLessThanOrEqual(2);
+    expect(Math.abs(boxes[1281]!.height - 576)).toBeLessThanOrEqual(2);
+    // The height change across the boundary is a deliberate mode switch,
+    // not an arbitrary jump — 720px (16:9 at 1279) down to ~576px is the
+    // intended, measured transition, not some much larger discontinuity.
+    expect(Math.abs(boxes[1279]!.height - boxes[1280]!.height)).toBeLessThan(200);
+
+    // Width stays full (no gutter) on both sides of the boundary either way.
+    expect(Math.round(boxes[1279]!.width)).toBe(1279);
+    expect(Math.round(boxes[1280]!.width)).toBe(1280);
+    expect(Math.round(boxes[1281]!.width)).toBe(1281);
+  });
+
+  test("1024×768 (tablet landscape, below the desktop gate): Hero stays in 16:9 no-crop mode, not the desktop clamp", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.goto("/");
+    await dismissBanner(page);
+
+    const section = page.locator("section").first();
+    const box = await section.boundingBox();
+    expect(box).not.toBeNull();
+    expect(Math.round(box!.width)).toBe(1024);
+    // 16:9, not the desktop clamp's height (which would be ~553px here).
+    expect(Math.abs(box!.height - 1024 * (9 / 16))).toBeLessThanOrEqual(2);
+  });
 });

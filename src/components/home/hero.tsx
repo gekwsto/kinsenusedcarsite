@@ -6,47 +6,37 @@ import { getPageContent } from "@/server/services/content.service";
 // as responsive class variants on those same elements, not as duplicated
 // markup.
 //
-// THE HERO IMAGE INVARIANT: the source photo (`homepage_banner.jpg`,
-// 1920x1080, exactly 16:9) is a fixed, locked composition — every
-// vehicle, both side walls, the full floor and sky. It is NEVER
-// responsively cropped, repositioned, or zoomed to make room for text, or
-// to force the Hero to fit inside one viewport's height, at ANY
-// viewport, with no exceptions. The section is therefore `aspect-[16/9]`
-// unconditionally (no explicit `height`/`min-height` competing with it —
-// per the CSS spec, either one would win over `aspect-ratio` and
-// reintroduce a crop): box shape matches the image's own shape exactly,
-// so `object-cover` has nothing left to crop on any edge, at any width.
-// An earlier pass kept one exception here — short landscape phones fell
-// back to a shorter `70vh` box, on the reasoning that a full 16:9 box
-// there (~475px tall at 844px width) exceeds the phone's own viewport
-// height. That reasoning was rejected: this is a normal scrollable web
-// document, not a presentation slide meant to fit one screen — a Hero
-// taller than a short landscape phone's viewport just means the rest of
-// the page starts a little further down, exactly like it already does on
-// every taller phone/tablet/desktop tier. Image integrity comes first.
+// THE HERO IMAGE ARCHITECTURE has two deliberate, intentional modes —
+// not a single universal rule, and not duplicated markup:
 //
-// The *text* is what adapts instead — its size, max-width and position
-// are tuned per band against how much genuinely clean wall the (always
-// uncropped) photo actually shows there (measured directly against a
-// 10%-grid overlay: clean from the top-left corner down the left edge,
-// no vehicle pixels before roughly x:33% of the image's width, the white
-// hatchback's rear bumper). Short-landscape phones keep their own
-// already-compact typography tier (smaller heading/paragraph, tighter
-// spacing) — that part was never about the image, only ever a size
-// adjustment for a narrow phone screen, so it's unaffected by removing
-// the geometry exception above it.
+// PHONE/TABLET (below `1280px`, `.hero-media-box`'s own base state):
+// `aspect-[16/9] w-full` — box shape matches the source photo
+// (`homepage_banner.jpg`, 1920x1080, exactly 16:9) exactly, so
+// `object-cover` has nothing left to crop on any edge. The complete
+// original composition — every vehicle, both side walls, the full floor
+// and sky — stays fully visible, no exceptions. Below 481px, text is
+// absolutely positioned over the photo's real safe area (percentages,
+// so it scales with the image); at 481px+ it's released into the
+// normal-flow, padding-driven content column instead.
 //
-// `481px` (not a real Tailwind `screens` breakpoint) is still the split
-// point for *typography/positioning* (not image geometry, which is now
-// unconditional): narrower than every landscape-phone width in the test
-// matrix (568px+), wider than every portrait-phone width (430px max).
-// Below it, text is absolutely positioned over the photo's real safe area
-// (`left-[4%] top-[4%] w-[34%]`, percentages so it scales with the
-// image); at 481px+ it's released into the normal-flow, padding-driven
-// content column instead (deliberately not `.container-page`, which
-// would center the block and open a growing gap on the left as the
-// viewport widens — padding-only keeps text pinned to the banner's true
-// left edge at every width).
+// LAPTOP/DESKTOP (`.hero-media-box`'s `1280px`+ rule, globals.css): the
+// Hero stays genuinely `width: 100%` — full-width visual impact, no
+// side gutters — but a real uncropped 16:9 box would need to grow taller
+// than useful at these widths (2560px wide -> 1440px tall), reading as
+// an oversized photo rather than a contained premium band. So
+// `aspect-ratio` is released there and a `height: clamp(...)` takes over
+// instead: the section becomes wider than 16:9, so `object-cover` scales
+// the photo to the section's own width and crops only vertically (sky
+// above the cars, floor below) — measured to stay restrained enough that
+// the horizontal composition and every vehicle stay intact. This is a
+// deliberate, accepted trade-off specific to the wide desktop tier, not
+// the phone/tablet invariant above it.
+//
+// `481px` (not a real Tailwind `screens` breakpoint) is the split point
+// for *typography/positioning*, independent of the `1280px` media-
+// geometry split above: narrower than every landscape-phone width in the
+// test matrix (568px+), wider than every portrait-phone width (430px
+// max).
 export async function Hero() {
   const content = await getPageContent("home.hero");
 
@@ -61,7 +51,7 @@ export async function Hero() {
   const subtitleLine2 = commaIndex === -1 ? null : content.subtitle.slice(commaIndex + 2);
 
   return (
-    <section className="relative aspect-[16/9] w-full overflow-hidden">
+    <section className="hero-media-box relative aspect-[16/9] w-full overflow-hidden">
       <Image src={content.image} alt="Kinsen hero image" fill priority sizes="100vw" className="object-cover" />
 
       {/* The black tint and vertical-centering flex only apply from

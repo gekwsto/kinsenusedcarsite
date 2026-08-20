@@ -74,18 +74,39 @@ html[data-platform="windows"] {
     @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
   }
 
-  /* Shared wide container — used by the sticky site header and the
-     `/vehicles` results layout only, so the header's logo/nav/account
-     cluster stays edge-aligned with the vehicles grid below it on large
-     screens. Substantially wider than the site's standard 1280px
-     `.container-page`, capped well short of full-bleed on ultrawide
-     monitors. Scoped to these two call sites (not a change to
-     `.container-page` itself) so every other page's layout is untouched. */
+  /* Shared wide container — used by the `/vehicles` results layout.
+     Substantially wider than the site's standard 1280px `.container-page`,
+     capped well short of full-bleed on ultrawide monitors. Scoped to this
+     one call site (not a change to `.container-page` itself) so every
+     other page's layout is untouched. */
   .container-wide {
     width: 100%;
     max-width: 1880px;
     margin-inline: auto;
     padding-inline: clamp(1.5rem, 2.4vw, 3rem);
+  }
+
+  /* True-large-desktop tier only (measured: normal desktop tops out at
+     1920-1920px-class monitors, where the 1880px cap already produces a
+     reasonable ~20px outer gutter). Beyond `2200px` — genuinely large/
+     ultrawide displays, well past every laptop and standard monitor width
+     in the test matrix — the 1880px cap was instead producing an
+     unintentional ~340px gutter *per side* at 2560px, because the shell
+     simply stopped growing while the viewport kept going. Raising the cap
+     to 2320px here (paired with `vehicle-grid.tsx`'s matching 4-column
+     tier at the same breakpoint) uses that reclaimed width for a fourth
+     vehicle card instead of dead space: at 2560px the outer gutter drops
+     to the intended ~120px per side, and — because this is still a capped
+     `max-width`, not `none` — genuinely ultrawide monitors (3440px+) stop
+     growing the shell at 2320px too, so the extra width becomes
+     intentional outer breathing room rather than an ever-stretching page.
+     Padding is deliberately left alone: the existing `clamp(...)` already
+     saturates at its 3rem/48px ceiling well before 2200px, which already
+     sits inside the brief's own suggested 48-56px range. */
+  @media (min-width: 2200px) {
+    .container-wide {
+      max-width: 2320px;
+    }
   }
 
   /* Site header's own container (src/components/layout/header.tsx). Same
@@ -119,6 +140,46 @@ html[data-platform="windows"] {
   .kinsen-header-logo {
     width: clamp(150px, calc(6.875rem + 3.906vw), 190px);
     height: clamp(2.8125rem, calc(2.0625rem + 1.1718vw), 3.5625rem);
+  }
+}
+
+/* Homepage Hero desktop media geometry (src/components/home/hero.tsx).
+   Two intentional modes, not a width cap:
+   PHONE/TABLET (below this rule): `aspect-[16/9] w-full` — box shape
+   matches the source photo exactly, so `object-cover` has nothing to
+   crop on any edge. The full original composition is mandatory there.
+   LAPTOP/DESKTOP (this rule, `1280px`+): the Hero stays genuinely
+   `width: 100%` — no cap, no side gutters, full-width visual impact
+   preserved — but `aspect-ratio` is released (`auto`) and an explicit
+   `height` takes over instead, because at these widths a real 16:9 box
+   would need to grow taller than is useful (1920px wide -> 1080px tall,
+   2560px wide -> 1440px tall) — a photo dominating the whole first
+   screen rather than a contained, premium Hero band. Since the section
+   is now wider than 16:9, `object-cover` on the `<Image>` scales the
+   photo to the section's own *width* and only crops vertically (sky
+   above the cars, floor below) — measured to stay a safe, restrained
+   crop that never touches the horizontal composition or clips any
+   vehicle; `object-position` stays the centered default.
+   `clamp(560px, max(72svh, 34vw), 1200px)`: a flat `72svh` ceiling alone
+   (an earlier version of this rule) let vertical crop climb unchecked as
+   width kept growing past height — 43% at 2560px, 57.6% at 3440px, since
+   a fixed absolute height against an ever-widening box means the box's
+   own aspect ratio (and therefore its crop) has no ceiling either.
+   `max(72svh, 34vw)` fixes that by giving the formula a second, WIDTH-
+   linked term: at ordinary laptop/desktop widths `72svh` alone already
+   exceeds `34vw` and stays the effective value (this tier is unaffected,
+   byte-identical to before), but once the viewport gets wide enough that
+   `34vw` overtakes it, height starts growing WITH width too — capping
+   the box's own aspect ratio, and with it the crop percentage, at a
+   roughly constant ~28% instead of climbing indefinitely. `1200px` is
+   the outer absolute ceiling for genuinely extreme monitors, so the Hero
+   still eventually stops growing rather than tracking width forever;
+   `560px` is unchanged, the same floor against ever reading as a thin
+   banner. */
+@media (min-width: 1280px) {
+  .hero-media-box {
+    aspect-ratio: auto;
+    height: clamp(560px, max(72svh, 34vw), 1200px);
   }
 }
 

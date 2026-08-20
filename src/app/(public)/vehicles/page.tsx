@@ -58,9 +58,16 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="container-wide py-8">
+      {/* The sidebar column's own `clamp(340px,18vw,380px)` already
+          saturates at its 380px ceiling well before 2200px, so the true-
+          large-desktop tier (see `.container-wide`'s matching cap in
+          globals.css and `VehicleGrid`'s 4-column tier) needs no new
+          `grid-template-columns` rule here — only a slightly larger
+          filter↔results gap, since the wider shell can afford a touch
+          more separation without the two feeling disconnected. */}
       <div
         id={VEHICLE_RESULTS_START_ID}
-        className="grid scroll-mt-[var(--kinsen-header-offset)] grid-cols-1 gap-5 lg:grid-cols-[clamp(300px,23vw,340px)_minmax(0,1fr)] lg:items-start xl:gap-6 xl:grid-cols-[clamp(320px,20vw,360px)_minmax(0,1fr)] 2xl:gap-7 2xl:grid-cols-[clamp(340px,18vw,380px)_minmax(0,1fr)]"
+        className="grid scroll-mt-[var(--kinsen-header-offset)] grid-cols-1 gap-5 lg:grid-cols-[clamp(300px,23vw,340px)_minmax(0,1fr)] lg:items-start xl:gap-6 xl:grid-cols-[clamp(320px,20vw,360px)_minmax(0,1fr)] 2xl:gap-7 2xl:grid-cols-[clamp(340px,18vw,380px)_minmax(0,1fr)] [@media(min-width:2200px)]:gap-8"
       >
         <VehicleFilterProvider>
           <VehicleFilters options={filterOptions} />
