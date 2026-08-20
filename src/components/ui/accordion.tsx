@@ -65,8 +65,16 @@ AccordionItem.displayName = "AccordionItem";
 
 const AccordionTrigger = React.forwardRef<
   React.ElementRef<typeof AccordionPrimitive.Trigger>,
-  React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Trigger>
->(({ className, children, onClick, ...props }, ref) => {
+  React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Trigger> & {
+    /** Overrides for the hardcoded chevron below — all optional, default
+     *  to the original 28px circle-and-fill chrome, so the mobile-nav and
+     *  cookie-consent accordions (the primitive's other two consumers)
+     *  are unaffected by a caller that doesn't pass them. */
+    chevronWrapperClassName?: string;
+    chevronClassName?: string;
+    chevronStrokeWidth?: number;
+  }
+>(({ className, children, onClick, chevronWrapperClassName, chevronClassName, chevronStrokeWidth = 2, ...props }, ref) => {
   const lockedRef = React.useContext(AccordionLockContext);
 
   const handleClick = React.useCallback(
@@ -98,8 +106,16 @@ const AccordionTrigger = React.forwardRef<
         {...props}
       >
         {children}
-        <span className="ml-2 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ink-muted transition-colors duration-150 group-hover:bg-black/[0.04]">
-          <ChevronDown className="h-4 w-4 transition-transform duration-200 group-data-[state=open]:rotate-180" />
+        <span
+          className={cn(
+            "ml-2 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ink-muted transition-colors duration-150 group-hover:bg-black/[0.04]",
+            chevronWrapperClassName,
+          )}
+        >
+          <ChevronDown
+            strokeWidth={chevronStrokeWidth}
+            className={cn("h-4 w-4 transition-transform duration-200 group-data-[state=open]:rotate-180", chevronClassName)}
+          />
         </span>
       </AccordionPrimitive.Trigger>
     </AccordionPrimitive.Header>

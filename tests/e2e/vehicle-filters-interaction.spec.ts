@@ -1,18 +1,22 @@
 import { test, expect, type Page } from "@playwright/test";
 import { bannerLocators } from "./helpers";
 
-// Locks the /vehicles Filters panel's interaction-hardening contract:
+// Locks the /vehicles Filters panel's premium-redesign contract
+// (src/components/vehicles/vehicle-filters.tsx, filter-typography.ts,
+// ui/accordion.tsx's chevron-override props):
+// - category headers render label + chevron only — no decorative icon
+//   chip (removed in the redesign; SECTION_ICON_MAP no longer exists);
 // - every interactive control's focus ring renders *inside* its own
 //   border box (never clipped by AccordionContent's load-bearing
 //   `overflow-hidden`, which the open/close animation depends on);
-// - a section's category icon/chevron color is driven by exactly one
-//   authoritative rule per state (open vs. closed), so hovering an
-//   already-open row can never revert it toward another color;
+// - the chevron is one flat navy color, unconditionally — never affected
+//   by hover or open/closed state, and never the cyan `filterHeading`
+//   token;
+// - each category row's background/border (rest/hover/open) is navy or
+//   neutral only, never cyan;
+// - real vertical gap separates one category row from the next;
 // - decorative row hover tinting only ever activates on a genuine
 //   fine-pointer/hover-capable device, never sticking after a touch tap.
-// See src/components/vehicles/filter-typography.ts (FILTER_FOCUS_CLASS,
-// FILTER_TRIGGER_CLASS) and vehicle-filters.tsx (ITEM_CLASS,
-// FilterSectionHeading) for the implementation these assert against.
 
 const NAVY = "rgb(2, 56, 89)";
 const WHITE = "rgb(255, 255, 255)";
@@ -34,13 +38,44 @@ function fuelTrigger(page: Page) {
   return page.getByRole("button", { name: /Καύσιμο/ });
 }
 
-function iconSpan(trigger: ReturnType<typeof fuelTrigger>) {
-  return trigger.locator("span > span").first();
-}
-
 function chevronSpan(trigger: ReturnType<typeof fuelTrigger>) {
   return trigger.locator(":scope > span:last-child");
 }
+
+// The AccordionItem row itself — `aside`'s or the mobile Sheet's
+// `[role="dialog"]`'s ancestor of the trigger button one level up from the
+// header, i.e. the element ITEM_CLASS's border/background classes live on.
+function itemRow(trigger: ReturnType<typeof fuelTrigger>) {
+  return trigger.locator("xpath=ancestor::*[contains(@class,'rounded-xl')][1]");
+}
+
+test.describe("vehicle filters — no decorative category icons", () => {
+  test("category headers render exactly one icon (the chevron) — no icon chip beside the label", async ({ page }) => {
+    await page.goto("/vehicles");
+    await dismissBanner(page);
+
+    const trigger = fuelTrigger(page);
+    await trigger.scrollIntoViewIfNeeded();
+
+    const svgCount = await trigger.locator("svg").count();
+    expect(svgCount).toBe(1); // the chevron only
+
+    // The label sits in its own plain span, not inside an icon-chip
+    // wrapper with fixed h-8/w-8 dimensions.
+    const label = trigger.getByText("Καύσιμο", { exact: true });
+    await expect(label).toBeVisible();
+  });
+
+  test("the main Φίλτρα heading has no icon beside it", async ({ page }) => {
+    await page.goto("/vehicles");
+    await dismissBanner(page);
+
+    const heading = page.locator("aside h2", { hasText: "Φίλτρα" });
+    await expect(heading).toBeVisible();
+    const iconCount = await page.locator("aside").locator("h2", { hasText: "Φίλτρα" }).locator("xpath=..").locator("svg").count();
+    expect(iconCount).toBe(0);
+  });
+});
 
 test.describe("vehicle filters — input focus is never clipped", () => {
   test("the maker search input's focus ring is inset (stays inside its border box)", async ({ page }) => {
@@ -94,65 +129,116 @@ test.describe("vehicle filters — input focus is never clipped", () => {
   });
 });
 
-test.describe("vehicle filters — deterministic icon/chevron color, no flicker", () => {
-  test("an open section's icon is a stable white-on-navy that hovering the row cannot revert", async ({ page }) => {
+test.describe("vehicle filters — deterministic chevron color, no flicker, no cyan", () => {
+  test("the chevron is deep navy at rest, stays navy on hover, and stays navy once open — never the cyan filterHeading token", async ({
+    page,
+  }) => {
     await page.goto("/vehicles");
     await dismissBanner(page);
 
     const trigger = fuelTrigger(page);
     await trigger.scrollIntoViewIfNeeded();
-    await trigger.click();
-    await expect(trigger).toHaveAttribute("data-state", "open");
-
-    const icon = iconSpan(trigger);
-    // toHaveCSS auto-retries, so this also waits out the 150ms
-    // background-color/color transition rather than reading a mid-flight
-    // interpolated value.
-    await expect(icon).toHaveCSS("background-color", NAVY);
-    await expect(icon).toHaveCSS("color", WHITE);
-    const before = await icon.evaluate((el) => {
-      const cs = getComputedStyle(el);
-      return { bg: cs.backgroundColor, color: cs.color };
-    });
-
-    await trigger.hover();
-    const afterHover = await icon.evaluate((el) => {
-      const cs = getComputedStyle(el);
-      return { bg: cs.backgroundColor, color: cs.color };
-    });
-    // Open + hover must resolve to the exact same values as open alone —
-    // if a second, competing rule were still targeting this property,
-    // hovering would visibly change at least one of these.
-    expect(afterHover).toEqual(before);
-  });
-
-  test("the chevron is deep navy while open, unaffected by hover, and never the cyan filterHeading token", async ({ page }) => {
-    await page.goto("/vehicles");
-    await dismissBanner(page);
-
-    const trigger = fuelTrigger(page);
-    await trigger.scrollIntoViewIfNeeded();
-    await trigger.click();
-    await expect(trigger).toHaveAttribute("data-state", "open");
-
     const chevron = chevronSpan(trigger);
+
+    await expect(trigger).toHaveAttribute("data-state", "closed");
     await expect(chevron).toHaveCSS("color", NAVY);
 
     await trigger.hover();
-    await expect(chevron).toHaveCSS("color", NAVY); // unchanged — one authoritative source, not two competing ones
+    await expect(chevron).toHaveCSS("color", NAVY); // unchanged on hover — no competing rule
+
+    await trigger.click();
+    await expect(trigger).toHaveAttribute("data-state", "open");
+    await expect(chevron).toHaveCSS("color", NAVY); // unchanged once open, too — one authoritative color, always
   });
 
-  test("a closed section's icon container is the neutral surface token, never the cyan filterHeading token", async ({ page }) => {
+  test("the chevron wrapper has no circle/box chrome — no background fill at rest or on hover", async ({ page }) => {
     await page.goto("/vehicles");
     await dismissBanner(page);
 
     const trigger = fuelTrigger(page);
-    await expect(trigger).toHaveAttribute("data-state", "closed");
+    await trigger.scrollIntoViewIfNeeded();
+    const chevron = chevronSpan(trigger);
 
-    const icon = iconSpan(trigger);
-    const bg = await icon.evaluate((el) => getComputedStyle(el).backgroundColor);
-    expect(bg).toBe(SURFACE);
-    expect(bg).not.toContain("124, 145"); // #007c91 (filterHeading) — the cyan-family token this replaces
+    await expect(chevron).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+    await trigger.hover();
+    await expect(chevron).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  });
+});
+
+test.describe("vehicle filters — category row hover/open states are navy or neutral, never cyan", () => {
+  test("a closed row's rest/hover background and border are neutral, never cyan", async ({ page }) => {
+    await page.goto("/vehicles");
+    await dismissBanner(page);
+
+    const trigger = fuelTrigger(page);
+    await trigger.scrollIntoViewIfNeeded();
+    const row = itemRow(trigger);
+
+    const rest = await row.evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(rest).toBe(WHITE);
+
+    await trigger.hover();
+    const hovered = await row.evaluate((el) => {
+      const cs = getComputedStyle(el);
+      return { bg: cs.backgroundColor, border: cs.borderColor };
+    });
+    // Neutral surface tint, navy-tinted border — never the cyan
+    // filterHeading (#007c91 -> "0, 124, 145") or accent (#39c0c3 ->
+    // "57, 192, 195") tokens.
+    expect(hovered.bg).not.toContain("124, 145");
+    expect(hovered.bg).not.toContain("192, 195");
+    expect(hovered.border).not.toContain("124, 145");
+    expect(hovered.border).not.toContain("192, 195");
+  });
+
+  test("an open row's background/border are a restrained navy tint, unaffected by hover", async ({ page }) => {
+    await page.goto("/vehicles");
+    await dismissBanner(page);
+
+    const trigger = fuelTrigger(page);
+    await trigger.scrollIntoViewIfNeeded();
+    await trigger.click();
+    await expect(trigger).toHaveAttribute("data-state", "open");
+    const row = itemRow(trigger);
+
+    // toHaveCSS auto-retries, so this also waits out the open/close
+    // background-color transition rather than reading a mid-flight
+    // interpolated value.
+    await expect(row).toHaveCSS("background-color", "rgba(2, 56, 89, 0.05)");
+    const openState = await row.evaluate((el) => {
+      const cs = getComputedStyle(el);
+      return { bg: cs.backgroundColor, border: cs.borderColor };
+    });
+
+    await trigger.hover();
+    await expect(row).toHaveCSS("background-color", openState.bg);
+    const openHovered = await row.evaluate((el) => {
+      const cs = getComputedStyle(el);
+      return { bg: cs.backgroundColor, border: cs.borderColor };
+    });
+
+    expect(openHovered).toEqual(openState);
+    expect(openState.bg).not.toContain("124, 145");
+    expect(openState.bg).not.toContain("192, 195");
+  });
+});
+
+test.describe("vehicle filters — real vertical gap between category rows", () => {
+  test("collapsed category rows have a real gap between them, not 0px", async ({ page }) => {
+    await page.goto("/vehicles");
+    await dismissBanner(page);
+
+    const items = page.locator('aside [class*="rounded-xl"]');
+    const count = await items.count();
+    expect(count).toBeGreaterThan(1);
+
+    const firstBox = await items.nth(0).boundingBox();
+    const secondBox = await items.nth(1).boundingBox();
+    expect(firstBox).not.toBeNull();
+    expect(secondBox).not.toBeNull();
+
+    const gap = secondBox!.y - (firstBox!.y + firstBox!.height);
+    expect(gap).toBeGreaterThan(4);
   });
 });
 
@@ -175,22 +261,110 @@ test.describe("vehicle filters — no decorative hover state sticks after a touc
 
     const trigger = fuelTrigger(page);
     await trigger.scrollIntoViewIfNeeded();
-    const icon = iconSpan(trigger);
+    const row = itemRow(trigger);
 
     await expect(trigger).toHaveAttribute("data-state", "closed");
-    await expect(icon).toHaveCSS("background-color", SURFACE);
+    await expect(row).toHaveCSS("background-color", WHITE);
 
     await trigger.tap();
     await expect(trigger).toHaveAttribute("data-state", "open");
-    await expect(icon).toHaveCSS("background-color", NAVY);
-    await expect(icon).toHaveCSS("color", WHITE);
+    // Back to the exact original rest state — a touch tap never leaves a
+    // hover-only tint (gated to `(hover: hover) and (pointer: fine)`,
+    // which this device never satisfies) stuck behind. Also waits out the
+    // AccordionTrigger click-lock (ui/accordion.tsx) so the next tap below
+    // isn't swallowed while the open animation is still mid-flight.
+    await expect(row).toHaveCSS("background-color", "rgba(2, 56, 89, 0.05)");
+    const openBg = await row.evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(openBg).not.toBe(SURFACE);
 
     await trigger.tap();
     await expect(trigger).toHaveAttribute("data-state", "closed");
-    // Back to the exact original rest state — a touch tap never leaves a
-    // hover-only tint (gated to `(hover: hover) and (pointer: fine)`,
-    // which this device never satisfies) stuck behind.
-    await expect(icon).toHaveCSS("background-color", SURFACE);
-    await expect(icon).toHaveCSS("color", NAVY);
+    await expect(row).toHaveCSS("background-color", WHITE);
+  });
+});
+
+test.describe("vehicle filters — accordion open state is independent of active filter count", () => {
+  test("clearing the last active filter (activeFilters -> 0) does not close other open dropdowns", async ({ page }) => {
+    await page.goto("/vehicles");
+    await dismissBanner(page);
+
+    const yearTrigger = page.getByRole("button", { name: /Χρονολογία/ });
+    const kmTrigger = page.getByRole("button", { name: /Χιλιόμετρα/ });
+    await yearTrigger.scrollIntoViewIfNeeded();
+    await yearTrigger.click();
+    await expect(yearTrigger).toHaveAttribute("data-state", "open");
+    await kmTrigger.click();
+    await expect(kmTrigger).toHaveAttribute("data-state", "open");
+
+    // Apply one filter in an unrelated section (fuel), so activeFilters
+    // goes 0 -> 1 without touching year/km.
+    const fuel = fuelTrigger(page);
+    await fuel.scrollIntoViewIfNeeded();
+    await fuel.click();
+    const firstToggle = page.locator('button[aria-pressed]').first();
+    await firstToggle.click();
+    const activeCount = page.getByText(/Ενεργά φίλτρα: \d+/);
+    await expect(activeCount).toHaveText("Ενεργά φίλτρα: 1");
+
+    // Clear it via "Καθαρισμός όλων" — the exact action that used to force
+    // every open section closed once activeFilters hit 0. `exact: true`
+    // disambiguates from the end-of-results section's own clear action
+    // ("Καθαρισμός όλων των φίλτρων"), a different button entirely.
+    await page.getByRole("button", { name: "Καθαρισμός όλων", exact: true }).click();
+    await expect(activeCount).toHaveCount(0); // the active-filters box only renders while chips.length > 0
+
+    await expect(yearTrigger).toHaveAttribute("data-state", "open");
+    await expect(kmTrigger).toHaveAttribute("data-state", "open");
+  });
+
+  test("applying then removing a filter within its OWN open section does not close that section", async ({ page }) => {
+    await page.goto("/vehicles");
+    await dismissBanner(page);
+
+    const yearTrigger = page.getByRole("button", { name: /Χρονολογία/ });
+    await yearTrigger.scrollIntoViewIfNeeded();
+    await yearTrigger.click();
+    await expect(yearTrigger).toHaveAttribute("data-state", "open");
+
+    const minSelect = page.getByRole("combobox", { name: "Ελάχιστη χρονολογία" });
+    await minSelect.click();
+    await page.getByRole("option").nth(1).click(); // first real year (index 0 is "Χωρίς ελάχιστο")
+    const activeCount = page.getByText(/Ενεργά φίλτρα: \d+/);
+    await expect(activeCount).toHaveText("Ενεργά φίλτρα: 1");
+    await expect(yearTrigger).toHaveAttribute("data-state", "open");
+
+    // Remove that same filter -> activeFilters back to 0. The section that
+    // owned the removed filter must stay open too — not just unrelated
+    // sections — since accordion state is now fully independent of
+    // whether any filter (anywhere) is active.
+    await minSelect.click();
+    await page.getByRole("option", { name: "Χωρίς ελάχιστο" }).click();
+    await expect(activeCount).toHaveCount(0);
+
+    await expect(yearTrigger).toHaveAttribute("data-state", "open");
+  });
+
+  test("Καθαρισμός όλων preserves every open section, including the one that held the cleared filter", async ({ page }) => {
+    await page.goto("/vehicles");
+    await dismissBanner(page);
+
+    const yearTrigger = page.getByRole("button", { name: /Χρονολογία/ });
+    const kmTrigger = page.getByRole("button", { name: /Χιλιόμετρα/ });
+    await yearTrigger.scrollIntoViewIfNeeded();
+    await yearTrigger.click();
+    await kmTrigger.click();
+    await expect(yearTrigger).toHaveAttribute("data-state", "open");
+    await expect(kmTrigger).toHaveAttribute("data-state", "open");
+
+    const minSelect = page.getByRole("combobox", { name: "Ελάχιστη χρονολογία" });
+    await minSelect.click();
+    await page.getByRole("option").nth(1).click();
+    await expect(page.getByText(/Ενεργά φίλτρα: \d+/)).toHaveText("Ενεργά φίλτρα: 1");
+
+    await page.getByRole("button", { name: "Καθαρισμός όλων", exact: true }).click();
+    await expect(page.getByText(/Ενεργά φίλτρα: \d+/)).toHaveCount(0);
+
+    await expect(yearTrigger).toHaveAttribute("data-state", "open");
+    await expect(kmTrigger).toHaveAttribute("data-state", "open");
   });
 });

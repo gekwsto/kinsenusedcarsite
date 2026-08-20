@@ -1,24 +1,7 @@
 "use client";
 
 import * as React from "react";
-import {
-  Search,
-  SlidersHorizontal,
-  Trash2,
-  X,
-  Euro,
-  Factory,
-  Calendar,
-  Gauge,
-  Fuel,
-  Cog,
-  Zap,
-  Settings2,
-  Palette,
-  Car,
-  Percent,
-  type LucideIcon,
-} from "lucide-react";
+import { Search, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,7 +13,14 @@ import { NumericRangeSelect } from "@/components/vehicles/numeric-range-select";
 import { FilterToggleButton } from "@/components/vehicles/filter-toggle-button";
 import { resolveFuelIcon, resolveTransmissionIcon, resolveVehicleTypeIcon, DEALS_ICON } from "@/components/vehicles/filter-option-metadata";
 import { MakerBadge } from "@/components/vehicles/maker-badge";
-import { FILTER_TRIGGER_CLASS, FILTER_FOCUS_CLASS } from "@/components/vehicles/filter-typography";
+import {
+  FILTER_TRIGGER_CLASS,
+  FILTER_FOCUS_CLASS,
+  FILTER_CHEVRON_WRAPPER_CLASS,
+  FILTER_CHEVRON_CLASS,
+  FILTER_CHEVRON_STROKE_WIDTH,
+  FILTER_TITLE_CLASS,
+} from "@/components/vehicles/filter-typography";
 import { createNumericRange } from "@/lib/numeric-range";
 import { cn, formatKm } from "@/lib/utils";
 import { normalizeForSearch as normalizeColorTerm, colorMatchesSearch, colorGroupKey, compareColors } from "@/lib/color-search";
@@ -107,34 +97,11 @@ function makerGroupLetter(value: string): string {
 // in vehicle-filter-provider.tsx's NumericField/CsvField).
 type VehicleFilterSection = "price" | "maker" | "year" | "km" | "fuel" | "cc" | "hp" | "transmissionType" | "color" | "typeOfCar" | "offers";
 
-const ALL_SECTIONS: VehicleFilterSection[] = ["price", "maker", "year", "km", "fuel", "cc", "hp", "transmissionType", "color", "typeOfCar", "offers"];
-
-// One fixed icon per section — purely decorative chrome for the panel's own
-// (code-defined, never database-driven) category labels above. This is a
-// different kind of mapping than resolveFuelIcon/resolveVehicleTypeIcon in
-// filter-option-metadata.ts: those resolve icons for open-ended *values*
-// that come from the database (a maker name, a color, a fuel string) and
-// therefore need a graceful fallback for anything unmapped. The eleven
-// sections here are a closed, hardcoded set (ALL_SECTIONS, immediately
-// above) that only changes when this file itself changes — so a plain
-// 1:1 map with no fallback is safe and can never go stale against real data.
-const SECTION_ICON_MAP: Record<VehicleFilterSection, LucideIcon> = {
-  price: Euro,
-  maker: Factory,
-  year: Calendar,
-  km: Gauge,
-  fuel: Fuel,
-  cc: Cog,
-  hp: Zap,
-  transmissionType: Settings2,
-  color: Palette,
-  typeOfCar: Car,
-  offers: Percent,
-};
-
-// Shared row chrome for every AccordionItem in the panel — rounded,
-// spaced rows with a soft tint while open, replacing the previous flat
-// full-bleed `border-b` divider list every section shared identically.
+// Shared row chrome for every AccordionItem in the panel — each category
+// reads as its own clean unit (subtle border, own surface) with real gap
+// between rows (see `filterCategories`'s `space-y-2.5` below), replacing
+// the previous flat full-bleed `border-b` divider list every section
+// shared identically.
 //
 // `hover:` and `data-[state=open]:` both used to set this same element's
 // `background-color` unconditionally, so an *open* row being hovered had
@@ -145,10 +112,13 @@ const SECTION_ICON_MAP: Record<VehicleFilterSection, LucideIcon> = {
 // exclusive: open rows keep one constant tint no matter the pointer, and
 // only closed rows ever receive the hover tint. That hover tint is also
 // gated to `(hover: hover) and (pointer: fine)` so a tap on a touch
-// device can never leave it visually stuck on afterward.
+// device can never leave it visually stuck on afterward. Every tint here
+// is navy (`primary`) or neutral (`border`, `surface`) — never the cyan
+// `filterHeading`/`accent` tokens, on hover or otherwise.
 const ITEM_CLASS =
-  "rounded-xl border-b-0 transition-colors duration-150 data-[state=open]:bg-primary/5 " +
-  "[@media(hover:hover)_and_(pointer:fine)]:data-[state=closed]:hover:bg-surface/60";
+  "rounded-xl border border-border/60 bg-white transition-colors duration-150 " +
+  "data-[state=open]:border-primary/20 data-[state=open]:bg-primary/5 " +
+  "[@media(hover:hover)_and_(pointer:fine)]:data-[state=closed]:hover:border-primary/15 [@media(hover:hover)_and_(pointer:fine)]:data-[state=closed]:hover:bg-surface/60";
 
 // Premium manufacturer tile — replaces the old compact checkbox row with a
 // large, centered logo (56px, well above the old 34px circle) so the brand
@@ -188,23 +158,14 @@ function MakerTile({ maker, checked, onToggle }: { maker: string; checked: boole
   );
 }
 
-// Icon chip + label + active-filter dot, shared by every accordion
-// trigger below. `group-data-[state=open]` reads the Radix Trigger's own
-// data-state (see ui/accordion.tsx's `group` class) — no separate
-// React-level "is this section open" bookkeeping needed just for this,
-// and no hover variant exists on this icon chip at all, so its color is
-// always driven by that one open/closed fact — never by transient
-// pointer position, so hovering an already-open row can never revert its
-// white icon back toward navy. `bg-surface` (not `bg-filterHeading/10`,
-// a teal-family token) is this repo's actual neutral/slate surface color
-// — the closed-state chip reads as a soft neutral container, not a cyan
-// one.
-function FilterSectionHeading({ icon: Icon, label, active }: { icon: LucideIcon; label: string; active: boolean }) {
+// Label + active-filter dot, shared by every accordion trigger below.
+// Category icon chips were removed here (the redesign's central change —
+// fixing this one shared component removes the icon from all eleven
+// category headers at once): typography, spacing and the chevron now
+// carry the whole visual hierarchy instead of an icon-box-per-row.
+function FilterSectionHeading({ label, active }: { label: string; active: boolean }) {
   return (
-    <span className="flex flex-1 items-center gap-3">
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface text-primary transition-colors duration-150 group-data-[state=open]:bg-primary group-data-[state=open]:text-white">
-        <Icon className="h-4 w-4" aria-hidden="true" />
-      </span>
+    <span className="flex flex-1 items-center gap-2">
       <span className="flex-1">{label}</span>
       {active && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-hidden="true" />}
     </span>
@@ -336,41 +297,24 @@ export function VehicleFilters({ options }: { options: VehicleFilterOptions }) {
   // (React's documented "adjusting state when a prop changes" pattern, not
   // a useEffect — this repo's lint config flags an unconditional
   // setState-in-effect as a cascading-render risk, same reasoning as
-  // PriceRangeSlider's prop-sync above). Reconciliation branches on
-  // `lastChangeSource` (VehicleFilterProvider) to implement three distinct,
-  // deliberately different policies:
-  //  - "filter" (a control here, or one chip's own remove button): only the
-  //    section(s) that actually transitioned active<->inactive are
-  //    toggled — a section the user manually opened with no filter in it,
-  //    or another section that's still active, is left exactly as it was.
-  //    Removing the very last active filter anywhere this way still only
-  //    closes ITS OWN section, never every section.
-  //  - "clear-all": every section closes, unconditionally — the one case
-  //    where "leave unrelated sections alone" does not apply.
-  //  - "external" (Back, Forward, a direct URL, a refresh): the restored
-  //    URL is authoritative, so the whole open-section set is rebuilt from
-  //    it, discarding any section state left over from a previous history
-  //    entry.
+  // PriceRangeSlider's prop-sync above). `openSections` itself is fully
+  // independent of which filters are active: applying or removing a
+  // filter — including the very last one, via a chip's own remove button
+  // or "Καθαρισμός όλων" — never opens or closes a section on its own.
+  // The sole exception is `lastChangeSource === "external"` (Back,
+  // Forward, a direct URL, a refresh): there the restored URL is
+  // authoritative for the *initial* open-section set on navigation, since
+  // there is no prior user accordion interaction in this session to
+  // preserve. Every other case leaves `openSections` untouched — it only
+  // ever changes through the Accordion's own `onValueChange` below (the
+  // user's explicit click), never as a side effect of filter state.
   const activeSections = React.useMemo(() => computeActiveSections(activeChips), [activeChips]);
   const [openSections, setOpenSections] = React.useState<string[]>(() => Array.from(activeSections));
   const [prevActiveSections, setPrevActiveSections] = React.useState(activeSections);
   if (!sectionSetsEqual(activeSections, prevActiveSections)) {
     setPrevActiveSections(activeSections);
-    if (lastChangeSource === "clear-all") {
-      setOpenSections([]);
-    } else if (lastChangeSource === "external") {
+    if (lastChangeSource === "external") {
       setOpenSections(Array.from(activeSections));
-    } else {
-      setOpenSections((current) => {
-        const next = new Set(current);
-        for (const section of ALL_SECTIONS) {
-          const wasActive = prevActiveSections.has(section);
-          const isActive = activeSections.has(section);
-          if (isActive && !wasActive) next.add(section);
-          if (!isActive && wasActive) next.delete(section);
-        }
-        return Array.from(next);
-      });
     }
   }
 
@@ -384,22 +328,29 @@ export function VehicleFilters({ options }: { options: VehicleFilterOptions }) {
   // `aside` markup further down).
   const filterHeader = (
     <div className="border-b border-border pb-3">
-      <div className="flex items-center gap-2.5">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-filterHeading/10 text-primary">
-          <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
-        </span>
-        <h2 className="text-2xl font-bold leading-tight text-primary">Φίλτρα</h2>
-      </div>
+      <h2 className={FILTER_TITLE_CLASS}>Φίλτρα</h2>
       <ActiveFiltersBox chips={activeChips} onRemoveChip={handleChipRemove} onClearAll={clearFilters} />
     </div>
   );
 
+  // `space-y-2.5` lives on Accordion itself (Radix's own Root, rendering as
+  // a plain div) rather than an outer wrapper, because `space-y-*` only
+  // spaces *direct* children — it needs to sit one level down, directly
+  // against the actual AccordionItems, to have any effect at all. (An
+  // earlier wrapper div here made this same mistake: its one and only child
+  // was Accordion, so the gap it declared never reached anything and
+  // collapsed rows sat directly flush against each other with 0px between
+  // them — exactly the "too close together" spacing the redesign fixes.)
   const filterCategories = (
-    <div className="space-y-1">
-      <Accordion type="multiple" value={openSections} onValueChange={setOpenSections}>
+    <Accordion type="multiple" value={openSections} onValueChange={setOpenSections} className="space-y-2.5">
         <AccordionItem value="price" className={ITEM_CLASS}>
-          <AccordionTrigger className={TRIGGER_CLASS}>
-            <FilterSectionHeading icon={SECTION_ICON_MAP.price} label="Τιμή" active={activeSections.has("price")} />
+          <AccordionTrigger
+            className={TRIGGER_CLASS}
+            chevronWrapperClassName={FILTER_CHEVRON_WRAPPER_CLASS}
+            chevronClassName={FILTER_CHEVRON_CLASS}
+            chevronStrokeWidth={FILTER_CHEVRON_STROKE_WIDTH}
+          >
+            <FilterSectionHeading label="Τιμή" active={activeSections.has("price")} />
           </AccordionTrigger>
           <AccordionContent className="space-y-5 px-2">
             <div className="space-y-2">
@@ -428,8 +379,13 @@ export function VehicleFilters({ options }: { options: VehicleFilterOptions }) {
 
         {options.makers.length > 0 && (
           <AccordionItem value="maker" className={ITEM_CLASS}>
-            <AccordionTrigger className={TRIGGER_CLASS}>
-              <FilterSectionHeading icon={SECTION_ICON_MAP.maker} label="Κατασκευαστής" active={activeSections.has("maker")} />
+            <AccordionTrigger
+              className={TRIGGER_CLASS}
+              chevronWrapperClassName={FILTER_CHEVRON_WRAPPER_CLASS}
+              chevronClassName={FILTER_CHEVRON_CLASS}
+              chevronStrokeWidth={FILTER_CHEVRON_STROKE_WIDTH}
+            >
+              <FilterSectionHeading label="Κατασκευαστής" active={activeSections.has("maker")} />
             </AccordionTrigger>
             <AccordionContent className="space-y-3 px-2">
               <div className="relative">
@@ -487,8 +443,13 @@ export function VehicleFilters({ options }: { options: VehicleFilterOptions }) {
         )}
 
         <AccordionItem value="year" className={ITEM_CLASS}>
-          <AccordionTrigger className={TRIGGER_CLASS}>
-            <FilterSectionHeading icon={SECTION_ICON_MAP.year} label="Χρονολογία" active={activeSections.has("year")} />
+          <AccordionTrigger
+            className={TRIGGER_CLASS}
+            chevronWrapperClassName={FILTER_CHEVRON_WRAPPER_CLASS}
+            chevronClassName={FILTER_CHEVRON_CLASS}
+            chevronStrokeWidth={FILTER_CHEVRON_STROKE_WIDTH}
+          >
+            <FilterSectionHeading label="Χρονολογία" active={activeSections.has("year")} />
           </AccordionTrigger>
           <AccordionContent className="px-2">
             <NumericRangeSelect
@@ -507,8 +468,13 @@ export function VehicleFilters({ options }: { options: VehicleFilterOptions }) {
         </AccordionItem>
 
         <AccordionItem value="km" className={ITEM_CLASS}>
-          <AccordionTrigger className={TRIGGER_CLASS}>
-            <FilterSectionHeading icon={SECTION_ICON_MAP.km} label="Χιλιόμετρα" active={activeSections.has("km")} />
+          <AccordionTrigger
+            className={TRIGGER_CLASS}
+            chevronWrapperClassName={FILTER_CHEVRON_WRAPPER_CLASS}
+            chevronClassName={FILTER_CHEVRON_CLASS}
+            chevronStrokeWidth={FILTER_CHEVRON_STROKE_WIDTH}
+          >
+            <FilterSectionHeading label="Χιλιόμετρα" active={activeSections.has("km")} />
           </AccordionTrigger>
           <AccordionContent className="px-2">
             <NumericRangeSelect
@@ -528,8 +494,13 @@ export function VehicleFilters({ options }: { options: VehicleFilterOptions }) {
 
         {options.fuels.length > 0 && (
           <AccordionItem value="fuel" className={ITEM_CLASS}>
-            <AccordionTrigger className={TRIGGER_CLASS}>
-              <FilterSectionHeading icon={SECTION_ICON_MAP.fuel} label="Καύσιμο" active={activeSections.has("fuel")} />
+            <AccordionTrigger
+              className={TRIGGER_CLASS}
+              chevronWrapperClassName={FILTER_CHEVRON_WRAPPER_CLASS}
+              chevronClassName={FILTER_CHEVRON_CLASS}
+              chevronStrokeWidth={FILTER_CHEVRON_STROKE_WIDTH}
+            >
+              <FilterSectionHeading label="Καύσιμο" active={activeSections.has("fuel")} />
             </AccordionTrigger>
             <AccordionContent className="px-2">
               <div className="flex flex-col gap-2">
@@ -548,8 +519,13 @@ export function VehicleFilters({ options }: { options: VehicleFilterOptions }) {
         )}
 
         <AccordionItem value="cc" className={ITEM_CLASS}>
-          <AccordionTrigger className={TRIGGER_CLASS}>
-            <FilterSectionHeading icon={SECTION_ICON_MAP.cc} label="Κυβικά (cc)" active={activeSections.has("cc")} />
+          <AccordionTrigger
+            className={TRIGGER_CLASS}
+            chevronWrapperClassName={FILTER_CHEVRON_WRAPPER_CLASS}
+            chevronClassName={FILTER_CHEVRON_CLASS}
+            chevronStrokeWidth={FILTER_CHEVRON_STROKE_WIDTH}
+          >
+            <FilterSectionHeading label="Κυβικά (cc)" active={activeSections.has("cc")} />
           </AccordionTrigger>
           <AccordionContent className="px-2">
             <NumericRangeSelect
@@ -568,8 +544,13 @@ export function VehicleFilters({ options }: { options: VehicleFilterOptions }) {
         </AccordionItem>
 
         <AccordionItem value="hp" className={ITEM_CLASS}>
-          <AccordionTrigger className={TRIGGER_CLASS}>
-            <FilterSectionHeading icon={SECTION_ICON_MAP.hp} label="Ιπποδύναμη (Bhp)" active={activeSections.has("hp")} />
+          <AccordionTrigger
+            className={TRIGGER_CLASS}
+            chevronWrapperClassName={FILTER_CHEVRON_WRAPPER_CLASS}
+            chevronClassName={FILTER_CHEVRON_CLASS}
+            chevronStrokeWidth={FILTER_CHEVRON_STROKE_WIDTH}
+          >
+            <FilterSectionHeading label="Ιπποδύναμη (Bhp)" active={activeSections.has("hp")} />
           </AccordionTrigger>
           <AccordionContent className="px-2">
             <NumericRangeSelect
@@ -589,8 +570,13 @@ export function VehicleFilters({ options }: { options: VehicleFilterOptions }) {
 
         {options.transmissions.length > 0 && (
           <AccordionItem value="transmissionType" className={ITEM_CLASS}>
-            <AccordionTrigger className={TRIGGER_CLASS}>
-              <FilterSectionHeading icon={SECTION_ICON_MAP.transmissionType} label="Κιβώτιο Ταχυτήτων" active={activeSections.has("transmissionType")} />
+            <AccordionTrigger
+              className={TRIGGER_CLASS}
+              chevronWrapperClassName={FILTER_CHEVRON_WRAPPER_CLASS}
+              chevronClassName={FILTER_CHEVRON_CLASS}
+              chevronStrokeWidth={FILTER_CHEVRON_STROKE_WIDTH}
+            >
+              <FilterSectionHeading label="Κιβώτιο Ταχυτήτων" active={activeSections.has("transmissionType")} />
             </AccordionTrigger>
             <AccordionContent className="px-2">
               <div className="flex flex-col gap-2">
@@ -610,8 +596,13 @@ export function VehicleFilters({ options }: { options: VehicleFilterOptions }) {
 
         {options.colors.length > 0 && (
           <AccordionItem value="color" className={ITEM_CLASS}>
-            <AccordionTrigger className={TRIGGER_CLASS}>
-              <FilterSectionHeading icon={SECTION_ICON_MAP.color} label="Χρώμα" active={activeSections.has("color")} />
+            <AccordionTrigger
+              className={TRIGGER_CLASS}
+              chevronWrapperClassName={FILTER_CHEVRON_WRAPPER_CLASS}
+              chevronClassName={FILTER_CHEVRON_CLASS}
+              chevronStrokeWidth={FILTER_CHEVRON_STROKE_WIDTH}
+            >
+              <FilterSectionHeading label="Χρώμα" active={activeSections.has("color")} />
             </AccordionTrigger>
             <AccordionContent className="space-y-3 px-2">
               <div className="relative">
@@ -667,8 +658,13 @@ export function VehicleFilters({ options }: { options: VehicleFilterOptions }) {
 
         {options.typesOfCar.length > 0 && (
           <AccordionItem value="typeOfCar" className={ITEM_CLASS}>
-            <AccordionTrigger className={TRIGGER_CLASS}>
-              <FilterSectionHeading icon={SECTION_ICON_MAP.typeOfCar} label="Τύπος Αυτοκινήτου" active={activeSections.has("typeOfCar")} />
+            <AccordionTrigger
+              className={TRIGGER_CLASS}
+              chevronWrapperClassName={FILTER_CHEVRON_WRAPPER_CLASS}
+              chevronClassName={FILTER_CHEVRON_CLASS}
+              chevronStrokeWidth={FILTER_CHEVRON_STROKE_WIDTH}
+            >
+              <FilterSectionHeading label="Τύπος Αυτοκινήτου" active={activeSections.has("typeOfCar")} />
             </AccordionTrigger>
             <AccordionContent className="px-2">
               <div className="flex flex-col gap-2">
@@ -688,8 +684,13 @@ export function VehicleFilters({ options }: { options: VehicleFilterOptions }) {
 
         {options.hasOffers && (
           <AccordionItem value="offers" className={ITEM_CLASS}>
-            <AccordionTrigger className={TRIGGER_CLASS}>
-              <FilterSectionHeading icon={SECTION_ICON_MAP.offers} label="Προσφορές" active={activeSections.has("offers")} />
+            <AccordionTrigger
+              className={TRIGGER_CLASS}
+              chevronWrapperClassName={FILTER_CHEVRON_WRAPPER_CLASS}
+              chevronClassName={FILTER_CHEVRON_CLASS}
+              chevronStrokeWidth={FILTER_CHEVRON_STROKE_WIDTH}
+            >
+              <FilterSectionHeading label="Προσφορές" active={activeSections.has("offers")} />
             </AccordionTrigger>
             <AccordionContent className="px-2">
               <FilterToggleButton
@@ -702,8 +703,7 @@ export function VehicleFilters({ options }: { options: VehicleFilterOptions }) {
             </AccordionContent>
           </AccordionItem>
         )}
-      </Accordion>
-    </div>
+    </Accordion>
   );
 
   return (

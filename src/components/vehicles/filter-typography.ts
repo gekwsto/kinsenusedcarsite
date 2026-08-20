@@ -14,23 +14,45 @@
 // mobile-nav/cookie-modal accordions (also built on ui/accordion.tsx, but
 // not consumers of this file) are untouched.
 //
-// The two `[&>span:last-child]:` rules give the trigger's hardcoded
-// chevron (ui/accordion.tsx's own last child, not exposed as a separate
-// prop) exactly one authoritative color per state — read directly off
-// this same trigger element via `data-[state]`, not a second/duplicate
-// piece of open-state bookkeeping:
-//  - open: deep navy, unconditionally — no hover variant is defined for
-//    this state, so nothing can compete with it while a row is open.
-//  - closed + real hover (`(hover:hover) and (pointer:fine)` — a touch
-//    tap can never satisfy this, so it never goes visually "stuck" after
-//    a tap): a slightly stronger navy.
-//  - closed, no hover: the muted rest color already on the shared
-//    chevron span (`text-ink-muted`, ui/accordion.tsx) shows through
-//    untouched, since neither rule above matches.
+// Every `clamp()` below shares the same two anchor points — 1280px
+// (laptop floor) and 2200px (the true-large-desktop tier already
+// established for the /vehicles listing shell: vehicle-grid.tsx,
+// globals.css's `.container-wide`) — so the whole hierarchy scales up
+// together across laptop/desktop/large-desktop and then goes flat past
+// 2200px, instead of several independently-tuned breakpoint jumps or
+// unbounded growth on ultrawide monitors. Below 1280px (tablet, mobile,
+// and the mobile Sheet, all sharing this same file) the preferred value
+// falls under each clamp's own floor, so it simply resolves to that
+// floor — a small, deliberate bump over the previous static mobile sizes
+// (never the large-desktop ceiling), not desktop type forced onto mobile.
+//
+// `py-[clamp(21px,19.6px+0.11vw,22px)]` (~42-44px combined) plus the
+// label's own taller line-height together target the ~64-68px effective
+// collapsed row height this polish pass calls for — padding alone, not a
+// forced fixed height.
 export const FILTER_TRIGGER_CLASS =
-  "px-2 py-3 text-[1.05rem] font-semibold leading-tight text-primary transition-colors " +
-  "[&[data-state=open]>span:last-child]:text-primary " +
-  "[@media(hover:hover)_and_(pointer:fine)]:[&[data-state=closed]:hover>span:last-child]:text-primary/70";
+  "px-2 py-[clamp(21px,19.6px+0.11vw,22px)] text-[clamp(17.5px,15.4px+0.16vw,19px)] font-semibold leading-tight text-primary transition-colors";
+
+// Replaces the trigger's hardcoded chevron chrome (ui/accordion.tsx's own
+// last-child span — a 28px circle with a hover fill) with a plain,
+// unboxed navy chevron: larger, unconditionally `text-primary` (no hover
+// color change — the rotation itself already signals open/closed, so nothing
+// else needs to compete for attention), and never the cyan `filterHeading`
+// token at any state. Passed to every filter AccordionTrigger via the
+// `chevronWrapperClassName`/`chevronClassName`/`chevronStrokeWidth` props
+// ui/accordion.tsx exposes for exactly this kind of consumer-specific
+// override, so mobile-nav's and the cookie modal's accordions (the other
+// two consumers of that shared primitive) keep their original chevron
+// untouched.
+export const FILTER_CHEVRON_WRAPPER_CLASS =
+  "h-auto w-auto shrink-0 rounded-none bg-transparent text-primary group-hover:bg-transparent";
+export const FILTER_CHEVRON_CLASS = "h-[clamp(22px,19.2px+0.22vw,24px)] w-[clamp(22px,19.2px+0.22vw,24px)]";
+export const FILTER_CHEVRON_STROKE_WIDTH = 2.375;
+
+// The main "Φίλτρα" panel heading — same clamp anchors as the trigger/
+// chevron above (1280px laptop floor -> 2200px large-desktop ceiling).
+export const FILTER_TITLE_CLASS =
+  "text-[clamp(25px,20.8px+0.33vw,28px)] font-bold leading-tight text-primary";
 
 export const FILTER_RANGE_LABEL_CLASS = "text-sm font-semibold text-primary/70";
 
